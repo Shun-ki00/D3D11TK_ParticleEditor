@@ -1,0 +1,35 @@
+{
+    "EFFECT": {
+        "PARTICLE_EMISSION_RATE": 30.0,
+        "PARTICLE_DURATION": 5.0,
+        "PARTICLE_LIFE_TIME": 2.0,
+
+        "PARTICLE_CONE_POSITION": [ -1.0, 0.0, -1.0 ],
+        "PARTICLE_SPHERE_CENTER": [ 1.0, 0.0, 1.0 ],
+
+        "PARTICLE_CONE_DIRECTION": [ -0.5, 1.0, -0.5 ],
+        "PARTICLE_START_SCALE": [ 0.5, 1.0, 0.5 ],
+
+        "PARTICLE_SPEED": 2.0,
+        "PARTICLE_GRAVITY_MODIFIER": 5.0,
+
+        "PARTICLE_START_SCALE_MIN": 0.5,
+        "PARTICLE_START_SCALE_MAX": 1.0,
+        "PARTICLE_END_SCALE_MIN": 0.2,
+        "PARTICLE_END_SCALE_MAX": 0.8,
+
+        "PARTICLE_ROTATION": 0.0,
+        "PARTICLE_START_ROTATION_MAX": 360.0,
+        "PARTICLE_ROTATION_SPEED_MIN": -90.0,
+        "PARTICLE_ROTATION_SPEED_MAX": 90.0,
+
+        "PARTICLE_START_COLOR": [ 1.0, 1.0, 1.0, 1.0 ],
+        "PARTICLE_END_COLOR": [ 1.0, 0.0, 0.0, 0.5 ],
+
+        "PARTICLE_IS_PLAYING": true,
+        "PARTICLE_CONE_EMIT_FROM_SHELL": true,
+
+        "PARTICLE_TEXTURE": "Particle",
+        "PARTICLE_SHADER": "Particle_PS"
+    }
+}

@@ -62,6 +62,8 @@ void Game::Initialize(HWND window, int width, int height)
     // デバイスリソースを共有リソースに設定
     m_commonResources->SetDeviceResources(m_deviceResources.get());
 
+    m_commonResources->SetCommonStates(m_commonStates.get());
+
     // 入力マネージャーの初期化処理
     m_inputManager = InputManager::GetInstance();
     m_inputManager->GetMouse()->SetWindow(window);
@@ -90,13 +92,13 @@ void Game::Initialize(HWND window, int width, int height)
     // コントローラーによるナビゲーションの有効化
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
     // マルチビューポート有効化
-    io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
+    //io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
     // ドッキング有効化
     io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
     // 日本語対応
-	ImFontConfig config;
+	/*ImFontConfig config;
     config.FontDataOwnedByAtlas = false;
-	io.Fonts->AddFontFromFileTTF("C:\\Windows\\Fonts\\meiryo.ttc", 20.0f, &config, io.Fonts->GetGlyphRangesJapanese());
+	io.Fonts->AddFontFromFileTTF("C:\\Windows\\Fonts\\meiryo.ttc", 20.0f, &config, io.Fonts->GetGlyphRangesJapanese());*/
 	
     //  Win32用の初期化
     ImGui_ImplWin32_Init(window);
@@ -385,13 +387,6 @@ void Game::OnDeviceRestored()
     CreateDeviceDependentResources();
     // ウィンドウサイズに依存したリソースを生成する
     CreateWindowSizeDependentResources();
-}
-// フルスクリーン対応
-void Game::SetFullscreenState(BOOL value)
-{
-    m_full_screen = value;
-    m_deviceResources->GetSwapChain()->SetFullscreenState(m_full_screen, nullptr);
-    if (value) m_deviceResources->CreateWindowSizeDependentResources();
 }
 
 #pragma endregion

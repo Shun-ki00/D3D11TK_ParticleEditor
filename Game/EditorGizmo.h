@@ -16,15 +16,32 @@ public:
 
 	// 円の描画
 	void DrawCircle(const DirectX::SimpleMath::Vector3& center, const float& radius, const DirectX::FXMVECTOR& color, const int& split);
+	void DrawCircle3D(
+		float height,
+		float radius,
+		const DirectX::SimpleMath::Matrix& world,
+		const DirectX::FXMVECTOR& color,
+		int split);
 	// 線の描画
 	void DrawLine(const DirectX::SimpleMath::Vector3& position, const DirectX::SimpleMath::Vector3& vector, const DirectX::FXMVECTOR& color);
-
+	void DrawLine3D(
+		const DirectX::SimpleMath::Vector3& localStart,
+		const DirectX::SimpleMath::Vector3& localEnd,
+		const DirectX::SimpleMath::Matrix& world,
+		const DirectX::FXMVECTOR& color);
 	// グリッドを描画
 	void DrawGrid();
 
 	// ギズモを描画
 	DirectX::SimpleMath::Matrix DrawManipulate(const DirectX::SimpleMath::Matrix& worldMatrix , ImGuizmo::OPERATION operation , ImGuizmo::MODE mode);
 
+	// スフィアを描画
+	void DrawSphere(DirectX::SimpleMath::Vector3 center, float radius);
+
+	// プリミティブ描画開始
+	void DrawPrimitiveBegin();
+	// プリミティブ描画終了
+	void DrawPrimitiveEnd();
 
 	// 初期化する
 	void Initialize();

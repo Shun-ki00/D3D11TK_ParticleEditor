@@ -24,7 +24,7 @@ namespace
     std::unique_ptr<Game> g_game;
 }
 // アプリケーション名を定義する
-LPCWSTR g_szAppName = L"Balloon";
+LPCWSTR g_szAppName = L"D3D11TK_ParticleEditor";
 // プロトタイプを宣言する
 LRESULT CALLBACK WndProc(HWND, UINT, WPARAM, LPARAM);
 void ExitGame() noexcept;
@@ -48,19 +48,6 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
     HRESULT hr = CoInitializeEx(nullptr, COINITBASE_MULTITHREADED);
     if (FAILED(hr))
         return 1;
-
-    // フルスクリーン対応
-    static bool s_fullscreen = false;
-    // メッセージボックスの表示
-    int result = MessageBox(NULL, L"フルスクリーンにしますか？", L"画面モード設定", MB_YESNO | MB_ICONQUESTION);
-
-    // 「はい」または「いいえ」の選択に応じてフルスクリーン設定
-    if (result == IDYES) {
-        s_fullscreen = true;
-    }
-    else {
-        s_fullscreen = false;
-    }
 
     // ゲームクラスのインスタンスを生成する
     g_game = std::make_unique<Game>();
@@ -112,7 +99,7 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
         GetClientRect(hwnd, &rc);
         // ゲームクラスを初期化する
         g_game->Initialize(hwnd, rc.right - rc.left, rc.bottom - rc.top);
-        if (s_fullscreen) g_game->SetFullscreenState(TRUE);
+
     }
 
     // メッセージループ
@@ -135,7 +122,6 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
     }
 
     // ゲームをリセットする
-    if (s_fullscreen) g_game->SetFullscreenState(FALSE);
     g_game.reset();
 
     CoUninitialize();

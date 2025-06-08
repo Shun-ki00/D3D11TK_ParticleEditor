@@ -1,0 +1,30 @@
+{
+    "duration": 5.0,
+    "startDelay": 0.0,
+    "lifeTime": 2.0,
+    "speed": 10.0,
+    "rotation": 0.0,
+    "gravityModifier": 9.8,
+    "emissionRate": 20.0,
+    "coneAngle": 45.0,
+    "coneRadius": 1.0,
+    "coneHeight": 3.0,
+    "sphereRadius": 2.0,
+    "sphereRandomDirectionStrength": 0.5,
+
+    "texture": "particle_texture.png",
+    "shader": "particle_shader.fx",
+
+    "isLooping": true,
+    "prewarm": false,
+    "isPlaying": true,
+    "coneEmitFromShell": false,
+    "sphereEmitFromShell": true,
+
+    "startScale": [ 1.0, 1.0, 1.0 ],
+    "coneDirection": [ 0.0, 1.0, 0.0 ],
+    "conePosition": [ 0.0, 0.0, 0.0 ],
+    "sphereCenter": [ 0.0, 0.0, 0.0 ],
+
+    "startColor": [ 1.0, 1.0, 1.0, 1.0 ]
+}

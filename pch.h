@@ -16,8 +16,8 @@
 
 // DirectX apps don't need GDI
 #define NODRAWTEXT
-#define NOGDI
-#define NOBITMAP
+//#define NOGDI
+//#define NOBITMAP
 
 // Include <mcx.h> if you need this
 #define NOMCX
@@ -30,9 +30,7 @@
 
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
-
 #include <wrl/client.h>
-
 #include <d3d11_1.h>
 #include <dxgi1_6.h>
 
@@ -48,8 +46,7 @@
 #include <iterator>
 #include <memory>
 #include <stdexcept>
-#include <system_error>
-#include <tuple>
+
 
 #ifdef _DEBUG
 #include <dxgidebug.h>
@@ -84,12 +81,12 @@ namespace DX
     }
 }
 
-#define IMGUI_DEFINE_MATH_OPERATORS
 #include "imgui/imgui.h"
 #include "imgui/imgui_impl_dx11.h"
 #include "imgui/imgui_impl_win32.h"
 #include "imgui/ImGuizmo.h"
 
+// DirectXTK
 #include <SimpleMath.h>
 #include "StepTimer.h"
 #include <PrimitiveBatch.h>
@@ -100,3 +97,8 @@ namespace DX
 #include <Effects.h>
 #include <Model.h>
 #include <Keyboard.h>
+
+// ŠO•”ƒ‰ƒCƒuƒ‰ƒŠ
+#include <nlohmann/json.hpp>
+#include <nlohmann/json_fwd.hpp>
+#include <MagicEnum/magic_enum.hpp>
