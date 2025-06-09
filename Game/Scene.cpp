@@ -1,16 +1,42 @@
 #include "pch.h"
 #include "Game/Scene.h"
-#include "Framework/Microsoft/ReadData.h"
-#include "Framework/CommonResources.h"
-#include "Framework/DebugCamera.h"
-#include "Game/Particle/ParticleEmitter.h"
-#include "imgui/ImGuizmo.h"
 #include <imgui/imgui_internal.h>
+#include "Framework/CommonResources.h"
+#include "Framework/Microsoft/ReadData.h"
+#include "Game/EditorGizmo.h"
+#include "Framework/FileDialogUtilities.h"
 #include "Game/Parameters/ParameterBuffers.h"
+#include "Game/Particle/ParticleEmitter.h"
 
 
+const int Scene::MAX_PARTICLE_VERTEX_COUNT = 700;
 
+/// <summary>
+/// コンストラクタ
+/// </summary>
 Scene::Scene()
+	:
+	m_commonResources{},
+	m_device{},
+	m_context{},
+	m_commonStates{},
+	m_gridMatrix{},
+	m_arrayGridMatrix{},
+	m_cameraDistance{},
+	m_mainViewMatrix{},
+	m_main{},
+	m_sub{},
+	m_fixedViewMatrix{},
+	m_particleEmitter{},
+	m_particleiInputLayout{},
+	m_particleConstBuffer{},
+	m_particleVertexShader{},
+	m_particleGeometryShader{},
+	m_particlePixelShader{},
+	m_particleVertexBuffer{},
+	m_billboardMatrix{},
+	m_textures{},
+	m_parametersData{}
 {
 	// インスタンスを取得する
 	m_commonResources = CommonResources::GetInstance();
@@ -19,40 +45,11 @@ Scene::Scene()
 	m_commonStates    = CommonResources::GetInstance()->GetCommonStates();
 }
 
+/// <summary>
+/// 初期化処理
+/// </summary>
 void Scene::Initialize()
 {
-	// 固定カメラ作成
-	DirectX::SimpleMath::Vector3 eye(5.0f, 5.0f, 5.0f);
-	DirectX::SimpleMath::Vector3 target(0.0f, 0.0f, 0.0f);
-	DirectX::SimpleMath::Vector3 up(0.0f, 1.0f, 0.0f);
-	m_fixedViewMatrix = DirectX::SimpleMath::Matrix::CreateLookAt(eye, target, up);
-
-
-	// デバッグカメラの作成
-	m_cameraDistance = 10.0f;
-	eye    = { 1.0f , 1.0f, 1.0f };
-	eye *= m_cameraDistance;
-	target = { 0.0f, 0.0f, 0.0f };
-	m_mainViewMatrix = DirectX::SimpleMath::Matrix::CreateLookAt(eye, target, up);
-
-
-	// グリッドのワールド行列作成
-	m_position   = DirectX::SimpleMath::Vector3::Zero;
-	m_rotation   = DirectX::SimpleMath::Quaternion::CreateFromAxisAngle(DirectX::SimpleMath::Vector3::Up,DirectX::XMConvertToRadians(45.0f));
-	m_scale      = DirectX::SimpleMath::Vector3::One;
-	m_world =
-		DirectX::SimpleMath::Matrix::CreateScale(m_scale) *
-		DirectX::SimpleMath::Matrix::CreateFromQuaternion(m_rotation) *
-		DirectX::SimpleMath::Matrix::CreateTranslation(m_position);
-	m_gridMatrix = DirectX::SimpleMath::Matrix::Identity;
-	this->MatrixToFloatArrayColumnMajor(m_gridMatrix, m_arrayGridMatrix);
-
-	// ギズモ操作の種類初期化
-	m_operation = ImGuizmo::ROTATE;
-	m_mode      = ImGuizmo::LOCAL;
-
-	this->CreateShaderAndBuffer();
-
 	// スクリーンサイズを取得する
 	const RECT windowSize = m_commonResources->GetDeviceResources()->GetOutputSize();
 
@@ -66,6 +63,27 @@ void Scene::Initialize()
 	m_sub->SetWindow(windowSize);
 
 
+	// 固定カメラのビュー行列作成
+	DirectX::SimpleMath::Vector3 eye(5.0f, 5.0f, 5.0f);
+	DirectX::SimpleMath::Vector3 target(0.0f, 0.0f, 0.0f);
+	DirectX::SimpleMath::Vector3 up(0.0f, 1.0f, 0.0f);
+	m_fixedViewMatrix = DirectX::SimpleMath::Matrix::CreateLookAt(eye, target, up);
+
+	// デバッグカメラのビュー行列
+	m_cameraDistance = 10.0f;
+	eye    = { 1.0f , 1.0f, 1.0f };
+	eye *= m_cameraDistance;
+	target = { 0.0f, 0.0f, 0.0f };
+	m_mainViewMatrix = DirectX::SimpleMath::Matrix::CreateLookAt(eye, target, up);
+
+	// グリッドのワールド行列作成
+	m_gridMatrix = DirectX::SimpleMath::Matrix::Identity;
+	EditorGizmo::MatrixToFloatArrayColumnMajor(m_gridMatrix, m_arrayGridMatrix);
+
+	// シェーダー、バッファの作成
+	this->CreateShaderAndBuffer();
+
+
 	// パラメータのデータをロードする
 	std::ifstream file("Resources/Json/Effect.json");
 	if (!file) return;
@@ -76,6 +94,7 @@ void Scene::Initialize()
 	// 初期パラメータのデータを取得
 	m_parametersData = j.get<ParticleParameters>(); 
 
+
 	// パーティクル生成器作成と初期化処理
 	m_particleEmitter = std::make_unique<ParticleEmitter>(m_parametersData);
 	m_particleEmitter->Initialize();
@@ -85,37 +104,22 @@ void Scene::Initialize()
 
 }
 
-
+/// <summary>
+/// 更新処理
+/// </summary>
+/// <param name="elapsedTime">経過時間</param>
 void Scene::Update(const float& elapsedTime)
 {
 	// パーティクルの更新
 	m_particleEmitter->Update(elapsedTime);
 }
 
+/// <summary>
+/// 描画処理
+/// </summary>
 void Scene::Render()
 {
-	using namespace DirectX::SimpleMath;
-
-	// オフスクリーン用のRTVを取得
-	auto rtv = m_main->GetRenderTargetView();
-	auto dsv = m_commonResources->GetDeviceResources()->GetDepthStencilView();
-
-	// オフスクリーン描画クリア
-	m_context->ClearRenderTargetView(rtv, DirectX::Colors::DarkGray);
-	m_context->ClearDepthStencilView(dsv, D3D11_CLEAR_DEPTH, 1.0f, 0);
-	m_context->OMSetRenderTargets(1, &rtv, dsv);
-
-	
-
-	// カメラ情報の取得
-	Matrix viewMatrix = m_mainViewMatrix;
-	Matrix projectionMatrix = m_commonResources->GetProjectionMatrix();
-
-	float viewArrayMatrix[16], projectionArrayMatrix[16], worldArrayMatrix[16];
-	this->MatrixToFloatArrayColumnMajor(viewMatrix, viewArrayMatrix);
-	this->MatrixToFloatArrayColumnMajor(projectionMatrix, projectionArrayMatrix);
-	this->MatrixToFloatArrayColumnMajor(m_world, worldArrayMatrix);
-
+	// 基底のウィンドウを描画
 	ImGui::SetNextWindowSize(ImVec2(1280, 720), ImGuiCond_Always);
 	ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_Always);
 	ImGui::Begin("MainWindow", nullptr,
@@ -147,6 +151,47 @@ void Scene::Render()
 
 	ImGui::End();
 
+
+	// メインシーンの描画
+	this->DrawMainScene();
+	// サブシーンの描画
+	this->DrawSubScene();
+	
+
+	// パーティクルデータの編集
+	this->ParticleDataEditor();
+}
+
+/// <summary>
+/// 終了処理
+/// </summary>
+void Scene::Finalize()
+{
+}
+
+/// <summary>
+/// メインシーンを描画する
+/// </summary>
+void Scene::DrawMainScene()
+{
+	// オフスクリーン用のRTVを取得
+	auto rtv = m_main->GetRenderTargetView();
+	auto dsv = m_commonResources->GetDeviceResources()->GetDepthStencilView();
+
+	// オフスクリーン描画クリア
+	m_context->ClearRenderTargetView(rtv, DirectX::Colors::DarkGray);
+	m_context->ClearDepthStencilView(dsv, D3D11_CLEAR_DEPTH, 1.0f, 0);
+	m_context->OMSetRenderTargets(1, &rtv, dsv);
+
+	// カメラ情報の取得
+	DirectX::SimpleMath::Matrix viewMatrix       = m_mainViewMatrix;
+	DirectX::SimpleMath::Matrix projectionMatrix = m_commonResources->GetProjectionMatrix();
+
+
+	float viewArrayMatrix[16], projectionArrayMatrix[16], worldArrayMatrix[16];
+	EditorGizmo::MatrixToFloatArrayColumnMajor(viewMatrix, viewArrayMatrix);
+	EditorGizmo::MatrixToFloatArrayColumnMajor(projectionMatrix, projectionArrayMatrix);
+
 	// --- ImGuiウィンドウ内での描画開始 ---
 	ImGui::Begin("Scene View", nullptr, ImGuiWindowFlags_None);
 
@@ -156,7 +201,7 @@ void Scene::Render()
 	ImVec2 screenPos = ImVec2(windowPos.x + cursorPos.x, windowPos.y + cursorPos.y);
 	ImVec2 contentSize = ImGui::GetContentRegionAvail();
 	// この領域ではウィンドウ移動を無効化
-	ImGui::SetWindowHitTestHole(ImGui::GetCurrentWindow(), ImVec2(screenPos.x , screenPos.y) , ImVec2(contentSize));
+	ImGui::SetWindowHitTestHole(ImGui::GetCurrentWindow(), ImVec2(screenPos.x, screenPos.y), ImVec2(contentSize));
 
 	// ギズモ用描画範囲を設定
 	ImGuizmo::SetRect(screenPos.x, screenPos.y, contentSize.x, contentSize.y);
@@ -172,9 +217,9 @@ void Scene::Render()
 	// グリッドとギズモを描画
 	ImGuizmo::SetDrawlist(ImGui::GetForegroundDrawList());
 	ImGuizmo::DrawGrid(viewArrayMatrix, projectionArrayMatrix, m_arrayGridMatrix, 10.0f);
-	
 
-	this->FloatArrayToMatrixColumnMajor(&m_mainViewMatrix, viewArrayMatrix);
+
+	EditorGizmo::FloatArrayToMatrixColumnMajor(&m_mainViewMatrix, viewArrayMatrix);
 
 	this->ParticleRender(m_particleEmitter->GetWorldMatrix(), viewMatrix, projectionMatrix);
 
@@ -195,44 +240,50 @@ void Scene::Render()
 
 
 	// 逆行列を取得（ビュー行列 → ワールド行列）
-	Matrix invView = m_mainViewMatrix.Invert();
+	DirectX::SimpleMath::Matrix invView = m_mainViewMatrix.Invert();
 	// カメラの位置（eye）は、逆行列の平行移動部分
-	Vector3 eyePosition = invView.Translation();
+	DirectX::SimpleMath::Vector3 eyePosition = invView.Translation();
 	// 注視点を固定
-	m_mainViewMatrix = Matrix::CreateLookAt(eyePosition, {0.0f , 0.0f ,0.0f}, DirectX::SimpleMath::Vector3::Up);
-	
+	m_mainViewMatrix = DirectX::SimpleMath::Matrix::CreateLookAt(eyePosition, { 0.0f , 0.0f ,0.0f }, DirectX::SimpleMath::Vector3::Up);
+
 
 	ImGui::End();
+}
 
-	// 最終出力ターゲットに戻す
-	auto defaultRTV = m_commonResources->GetDeviceResources()->GetRenderTargetView();
-	auto defaultDSV = m_commonResources->GetDeviceResources()->GetDepthStencilView();
-	m_context->ClearRenderTargetView(defaultRTV, DirectX::Colors::CornflowerBlue);
-	m_context->ClearDepthStencilView(defaultDSV, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
-	m_context->OMSetRenderTargets(1, &defaultRTV, nullptr);
-
+/// <summary>
+/// サブシーンを描画する
+/// </summary>
+void Scene::DrawSubScene()
+{
+	// カメラ情報の取得
+	DirectX::SimpleMath::Matrix viewMatrix = m_mainViewMatrix;
+	DirectX::SimpleMath::Matrix projectionMatrix = m_commonResources->GetProjectionMatrix();
+	float viewArrayMatrix[16], projectionArrayMatrix[16];
+	EditorGizmo::MatrixToFloatArrayColumnMajor(viewMatrix, viewArrayMatrix);
+	EditorGizmo::MatrixToFloatArrayColumnMajor(projectionMatrix, projectionArrayMatrix);
 
 	// オフスクリーン用のRTVを取得
-	rtv = m_sub->GetRenderTargetView();
-	dsv = m_commonResources->GetDeviceResources()->GetDepthStencilView();
+	auto rtv = m_sub->GetRenderTargetView();
+	auto dsv = m_commonResources->GetDeviceResources()->GetDepthStencilView();
 
 	// オフスクリーン描画クリア
 	m_context->ClearRenderTargetView(rtv, DirectX::Colors::DarkGray);
 	m_context->ClearDepthStencilView(dsv, D3D11_CLEAR_DEPTH, 1.0f, 0);
 	m_context->OMSetRenderTargets(1, &rtv, dsv);
 
-	this->ParticleRender(DirectX::SimpleMath::Matrix::Identity ,m_fixedViewMatrix, projectionMatrix);
+	// 粒子を描画する
+	this->ParticleRender(DirectX::SimpleMath::Matrix::Identity, m_fixedViewMatrix, projectionMatrix);
 
 	// ビューの変更
-	this->MatrixToFloatArrayColumnMajor(m_fixedViewMatrix, viewArrayMatrix);
+	EditorGizmo::MatrixToFloatArrayColumnMajor(m_fixedViewMatrix, viewArrayMatrix);
 
 	// --- ImGuiウィンドウ内での描画開始 ---
 	ImGui::Begin("Scene View2", nullptr, ImGuiWindowFlags_None);
 
-	windowPos = ImGui::GetWindowPos();
-	cursorPos = ImGui::GetCursorPos();
-	screenPos = ImVec2(windowPos.x + cursorPos.x, windowPos.y + cursorPos.y);
-	contentSize = ImGui::GetContentRegionAvail();
+	ImVec2 windowPos = ImGui::GetWindowPos();
+	ImVec2 cursorPos = ImGui::GetCursorPos();
+	ImVec2 screenPos = ImVec2(windowPos.x + cursorPos.x, windowPos.y + cursorPos.y);
+	ImVec2 contentSize = ImGui::GetContentRegionAvail();
 	// この領域ではウィンドウ移動を無効化
 	ImGui::SetWindowHitTestHole(ImGui::GetCurrentWindow(), ImVec2(screenPos.x, screenPos.y), ImVec2(contentSize));
 
@@ -258,24 +309,12 @@ void Scene::Render()
 	ImGui::End();
 
 	// 最終出力ターゲットに戻す
-	defaultRTV = m_commonResources->GetDeviceResources()->GetRenderTargetView();
-	defaultDSV = m_commonResources->GetDeviceResources()->GetDepthStencilView();
+	auto defaultRTV = m_commonResources->GetDeviceResources()->GetRenderTargetView();
+	auto defaultDSV = m_commonResources->GetDeviceResources()->GetDepthStencilView();
 	m_context->ClearRenderTargetView(defaultRTV, DirectX::Colors::CornflowerBlue);
 	m_context->ClearDepthStencilView(defaultDSV, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
 	m_context->OMSetRenderTargets(1, &defaultRTV, nullptr);
-
-
-	// エミッタ制御ウィンドウ
-	m_particleEmitter->DebugWidnow();
-
-	// パーティクルデータの編集
-	this->ParticleDataEditor();
 }
-
-void Scene::Finalize()
-{
-}
-
 
 /// <summary>
 /// 粒子を描画する
@@ -375,6 +414,42 @@ void Scene::ParticleDataEditor()
 {
 	ImGui::Begin("Particle Parameters Editor");
 
+	// メニューバーの開始
+	if (ImGui::BeginMainMenuBar())
+	{
+		if (ImGui::BeginMenu("File"))
+		{
+			if (ImGui::MenuItem("Load from JSON"))
+			{
+				// 読み込めたときだけ代入
+				if (auto parametersOpt = FileDialogUtilities::OpenJsonFile<ParticleParameters>()) {
+					m_parametersData = *parametersOpt; 
+				}
+			}
+
+			if (ImGui::MenuItem("Save to JSON"))
+			{
+				// JSONセーブ処理
+				FileDialogUtilities::SaveJsonFile<ParticleParameters>(m_parametersData);
+			}
+
+			if (ImGui::MenuItem("Load Texture"))
+			{
+				// テクスチャロード処理
+				Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> texture = FileDialogUtilities::GetLoadTexture(m_device);
+
+				// nullptrで無ければ格納
+				if (texture != nullptr)
+					// テクスチャを格納する
+					m_textures.push_back(std::move(texture));
+			}
+
+			ImGui::EndMenu();
+		}
+		ImGui::EndMainMenuBar();
+	}
+
+
 	// float入力
 	ImGui::InputFloat("Duration", &m_parametersData.duration);
 	ImGui::InputFloat("Start Delay", &m_parametersData.startDelay);
@@ -396,19 +471,6 @@ void Scene::ParticleDataEditor()
 	ImGui::Checkbox("Cone Emit From Shell", &m_parametersData.coneEmitFromShell);
 	ImGui::Checkbox("Sphere Emit From Shell", &m_parametersData.sphereEmitFromShell);
 
-	// string 入力
-	static char textureBuf[256];
-	strncpy(textureBuf, m_parametersData.texture.c_str(), sizeof(textureBuf));
-	if (ImGui::InputText("Texture", textureBuf, IM_ARRAYSIZE(textureBuf))) {
-		m_parametersData.texture = textureBuf;
-	}
-
-	static char shaderBuf[256];
-	strncpy(shaderBuf, m_parametersData.shader.c_str(), sizeof(shaderBuf));
-	if (ImGui::InputText("Shader", shaderBuf, IM_ARRAYSIZE(shaderBuf))) {
-		m_parametersData.shader = shaderBuf;
-	}
-
 	// Vector3 入力
 	ImGui::InputFloat3("Start Scale", &m_parametersData.startScale.x);
 	ImGui::InputFloat3("Cone Direction", &m_parametersData.coneDirection.x);
@@ -418,30 +480,51 @@ void Scene::ParticleDataEditor()
 	// Vector4 入力
 	ImGui::InputFloat4("Start Color", &m_parametersData.startColor.x);
 
+
+
+	// 現在選択されているテクスチャインデックス
+	static int selectedTextureIndex = 0;
+
+	// テクスチャ数に基づいて最大値を制限
+	const int textureCount = static_cast<int>(m_textures.size());
+	if (textureCount > 0)
+	{
+		ImGui::Text("Texture Index");
+
+		ImGui::SameLine();
+		if (ImGui::ArrowButton("##Left", ImGuiDir_Left))
+		{
+			if (selectedTextureIndex > 0) --selectedTextureIndex;
+		}
+
+		ImGui::SameLine();
+		ImGui::Text("%d / %d", selectedTextureIndex + 1, textureCount);
+
+		ImGui::SameLine();
+		if (ImGui::ArrowButton("##Right", ImGuiDir_Right))
+		{
+			if (selectedTextureIndex < textureCount - 1) ++selectedTextureIndex;
+		}
+
+		// 選択されたテクスチャを使用
+		m_particleEmitter->SetTexture(m_textures[selectedTextureIndex].Get());
+	}
+	else
+	{
+		ImGui::Text("No textures loaded.");
+	}
+
+
 	ImGui::End();
 
 	// エミッタのデータ更新
 	m_particleEmitter->SetParticleParameters(m_parametersData);
-
-	// エミッタのパラメータを変更
-	// テクスチャの変更があった場合　テクスチャの変更
-
 }
 
 
-// SimpleMathの Matrix を float[16]配列 に変換する
-void Scene::MatrixToFloatArrayColumnMajor(const DirectX::SimpleMath::Matrix& matrix, float* mat)
-{
-	memcpy(mat, &matrix, sizeof(float) * 16);
-}
-
-// SimpleMathの float[16]配列 を Matrix に変換する
-void Scene::FloatArrayToMatrixColumnMajor(DirectX::SimpleMath::Matrix* matrix, const float* mat)
-{
-	memcpy(matrix, mat, sizeof(DirectX::SimpleMath::Matrix));
-}
-
-
+/// <summary>
+/// シェーダー、バッファの作成
+/// </summary>
 void Scene::CreateShaderAndBuffer()
 {
 	std::vector<uint8_t> blob;
@@ -466,7 +549,7 @@ void Scene::CreateShaderAndBuffer()
 			m_particleGeometryShader.ReleaseAndGetAddressOf())
 	);
 
-	// シェーダーをロードする
+	// ピクセルシェーダーをロードする
 	blob = DX::ReadData(L"Resources/Shaders/cso/Particle_PS.cso");
 	DX::ThrowIfFailed(
 		m_device->CreatePixelShader(blob.data(), blob.size(), nullptr,
@@ -477,7 +560,7 @@ void Scene::CreateShaderAndBuffer()
 	D3D11_BUFFER_DESC desc = {};
 	ZeroMemory(&desc, sizeof(desc));
 	// サイズは必要な頂点分にする
-	desc.ByteWidth = sizeof(DirectX::VertexPositionColorTexture) * 700;
+	desc.ByteWidth = sizeof(DirectX::VertexPositionColorTexture) * MAX_PARTICLE_VERTEX_COUNT;
 	// 毎フレーム書き換えるならDYNAMICを使う
 	desc.Usage = D3D11_USAGE_DYNAMIC;
 	// バインドフラグはVertexBuffer

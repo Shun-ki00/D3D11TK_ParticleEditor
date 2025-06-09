@@ -75,3 +75,33 @@ inline void from_json(const json& j, ParticleParameters& p)
 	std::vector<float> vec4;
 	j.at("startColor").get_to(vec4); p.startColor = { vec4[0], vec4[1], vec4[2], vec4[3] };
 }
+
+inline void to_json(nlohmann::json& j, const ParticleParameters& p)
+{
+	j = {
+		{"duration", p.duration},
+		{"startDelay", p.startDelay},
+		{"lifeTime", p.lifeTime},
+		{"speed", p.speed},
+		{"rotation", p.rotation},
+		{"gravityModifier", p.gravityModifier},
+		{"emissionRate", p.emissionRate},
+		{"coneAngle", p.coneAngle},
+		{"coneRadius", p.coneRadius},
+		{"coneHeight", p.coneHeight},
+		{"sphereRadius", p.sphereRadius},
+		{"sphereRandomDirectionStrength", p.sphereRandomDirectionStrength},
+		{"texture", p.texture},
+		{"shader", p.shader},
+		{"isLooping", p.isLooping},
+		{"prewarm", p.prewarm},
+		{"isPlaying", p.isPlaying},
+		{"coneEmitFromShell", p.coneEmitFromShell},
+		{"sphereEmitFromShell", p.sphereEmitFromShell},
+		{"startScale", std::vector<float>{p.startScale.x, p.startScale.y, p.startScale.z}},
+		{"coneDirection", std::vector<float>{p.coneDirection.x, p.coneDirection.y, p.coneDirection.z}},
+		{"conePosition", std::vector<float>{p.conePosition.x, p.conePosition.y, p.conePosition.z}},
+		{"sphereCenter", std::vector<float>{p.sphereCenter.x, p.sphereCenter.y, p.sphereCenter.z}},
+		{"startColor", std::vector<float>{p.startColor.x, p.startColor.y, p.startColor.z, p.startColor.w}}
+	};
+}

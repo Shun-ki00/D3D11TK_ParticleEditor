@@ -8,9 +8,9 @@ class EditorGizmo
 public:
 
 	// TK提供のラッパーから配列に変換
-	void MatrixToFloatArrayColumnMajor(const DirectX::SimpleMath::Matrix& matrix, float* mat);
+	static void MatrixToFloatArrayColumnMajor(const DirectX::SimpleMath::Matrix& matrix, float* mat);
 	// TK提供のラッパーから配列に変換
-	void FloatArrayToMatrixColumnMajor(DirectX::SimpleMath::Matrix* matrix, const float* mat);
+	static void FloatArrayToMatrixColumnMajor(DirectX::SimpleMath::Matrix* matrix, const float* mat);
 
 public:
 
@@ -29,14 +29,17 @@ public:
 		const DirectX::SimpleMath::Vector3& localEnd,
 		const DirectX::SimpleMath::Matrix& world,
 		const DirectX::FXMVECTOR& color);
+
 	// グリッドを描画
 	void DrawGrid();
-
 	// ギズモを描画
 	DirectX::SimpleMath::Matrix DrawManipulate(const DirectX::SimpleMath::Matrix& worldMatrix , ImGuizmo::OPERATION operation , ImGuizmo::MODE mode);
 
 	// スフィアを描画
 	void DrawSphere(DirectX::SimpleMath::Vector3 center, float radius);
+	// コーンの描画
+	void DrawCone(const DirectX::SimpleMath::Vector3& position ,const float& radius,const float& height, const float& angle ,const DirectX::SimpleMath::Matrix& worldMatrix , const DirectX::FXMVECTOR& color);
+
 
 	// プリミティブ描画開始
 	void DrawPrimitiveBegin();
@@ -46,7 +49,9 @@ public:
 	// 初期化する
 	void Initialize();
 
+	// コンストラクタ
 	EditorGizmo();
+	// デストラクタ
 	~EditorGizmo() = default;
 
 private:

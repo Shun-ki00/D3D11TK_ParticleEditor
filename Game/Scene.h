@@ -11,6 +11,11 @@ class ParticleEmitter;
 
 class Scene
 {
+public:
+
+	// 最大粒子の数
+	static const int MAX_PARTICLE_VERTEX_COUNT;
+
 private:
 
 	struct ParticleConstBuffer
@@ -45,11 +50,6 @@ public:
 
 private:
 
-	// TK提供のラッパーから配列に変換
-	void MatrixToFloatArrayColumnMajor(const DirectX::SimpleMath::Matrix& matrix, float* mat);
-	// TK提供のラッパーから配列に変換
-	void FloatArrayToMatrixColumnMajor(DirectX::SimpleMath::Matrix* matrix,const float* mat);
-
 	// シェーダーとバッファの作成
 	void CreateShaderAndBuffer();
 	// パーティクル描画処理
@@ -58,6 +58,12 @@ private:
 
 	// パーティクルデータの編集
 	void ParticleDataEditor();
+
+	// メインシーンを描画
+	void DrawMainScene();
+	// サブシーンを描画
+	void DrawSubScene();
+
 
 private:
 
@@ -71,15 +77,6 @@ private:
 	// コモンステート
 	DirectX::CommonStates* m_commonStates;
 	
-	// モデル座標
-	DirectX::SimpleMath::Vector3 m_position;
-	// モデル回転
-	DirectX::SimpleMath::Quaternion m_rotation;
-	// モデルスケール
-	DirectX::SimpleMath::Vector3 m_scale;
-
-	// モデルワールド行列
-	DirectX::SimpleMath::Matrix m_world;
 
 	// 原点行列
 	DirectX::SimpleMath::Matrix m_gridMatrix;
@@ -89,10 +86,7 @@ private:
 	float m_cameraDistance;
 	DirectX::SimpleMath::Matrix m_mainViewMatrix;
 
-	// ギズモのモード
-	ImGuizmo::OPERATION m_operation;
-	ImGuizmo::MODE m_mode;
-
+	
 	// オフスクリーン用レンダーテクスチャ
 	std::unique_ptr<DX::RenderTexture> m_main;
 	// オフスクリーン用レンダーテクスチャ
@@ -123,6 +117,8 @@ private:
 	// ビルボード
 	DirectX::SimpleMath::Matrix m_billboardMatrix;
 
+	// テクスチャコンテナ
+	std::vector<Microsoft::WRL::ComPtr<ID3D11ShaderResourceView>> m_textures;
 
 	// パラメータデータ
 	ParticleParameters m_parametersData;

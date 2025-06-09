@@ -13,7 +13,9 @@ float RandomUtillities::RandomFloat(float min, float max)
 }
 
 
-DirectX::SimpleMath::Vector3 RandomUtillities::GenerateConeEmissio
+
+
+void RandomUtillities::GenerateConeEmissio
 (
 	float coneAngleDeg,          // コーンの角度
 	float radius,            // コーンの半径
@@ -43,7 +45,36 @@ DirectX::SimpleMath::Vector3 RandomUtillities::GenerateConeEmissio
     direction.Normalize();
 
     outVelocity = direction * coneHeight;
+}
 
-    return outVelocity;
 
+
+void RandomUtillities::GenerateSphereEmission(
+    float sphereRadius,
+    bool emitFromShell,
+    const DirectX::SimpleMath::Vector3& center,
+    float randomDirectionStrength,
+    DirectX::SimpleMath::Vector3& outPosition,
+    DirectX::SimpleMath::Vector3& outVelocity)
+{
+    // 球面上のランダムな単位ベクトル
+    float theta = RandomFloat(0.0f, DirectX::XM_2PI);
+    float phi = acosf(RandomFloat(-1.0f, 1.0f)); // φの分布に注意（球面均一）
+
+    float x = sinf(phi) * cosf(theta);
+    float y = cosf(phi);
+    float z = sinf(phi) * sinf(theta);
+
+    DirectX::SimpleMath::Vector3 direction = DirectX::SimpleMath::Vector3(x, y, z);
+
+    float radius = emitFromShell ? sphereRadius : RandomFloat(0.0f, sphereRadius);
+    outPosition = center + direction * radius;
+
+    // 外向きに少しブレた方向ベクトルを返す
+    DirectX::SimpleMath::Vector3 randomDir = direction +
+        DirectX::SimpleMath::Vector3(RandomFloat(-1, 1), RandomFloat(-1, 1), RandomFloat(-1, 1))
+        * randomDirectionStrength;
+    randomDir.Normalize();
+
+    outVelocity = randomDir;
 }

@@ -3,13 +3,29 @@
 #include "Framework/Microsoft/DebugDraw.h"
 #include "Framework/CommonResources.h"
 
-
+/// <summary>
+/// コンストラクタ
+/// </summary>
 EditorGizmo::EditorGizmo()
+	:
+	m_commonResources{},
+	m_device{},
+	m_context{},
+	m_commonStates{},
+	m_spriteBatch{},
+	m_spriteFont{},
+	m_basicEffect{},
+	m_primitiveBatch{},
+	m_effectFactory{},
+	m_rasterrizerState{},
+	m_inputLayout{}
 {
 	m_commonResources = CommonResources::GetInstance();
 }
 
-
+/// <summary>
+/// 初期化処理
+/// </summary>
 void EditorGizmo::Initialize()
 {
 	m_device = m_commonResources->GetDeviceResources()->GetD3DDevice();
@@ -53,6 +69,9 @@ void EditorGizmo::Initialize()
 	m_effectFactory = std::make_unique<DirectX::EffectFactory>(m_device);
 }
 
+/// <summary>
+/// プリミティブバッチの開始
+/// </summary>
 void EditorGizmo::DrawPrimitiveBegin()
 {
 	// ブレンディング状態を設定する
@@ -78,6 +97,9 @@ void EditorGizmo::DrawPrimitiveBegin()
 	m_primitiveBatch->Begin();
 }
 
+/// <summary>
+/// プリミティブバッチの終了
+/// </summary>
 void EditorGizmo::DrawPrimitiveEnd()
 {
 	// プリミティブパッチを終了する
@@ -85,7 +107,12 @@ void EditorGizmo::DrawPrimitiveEnd()
 }
 
 
-// 線分を描画する
+/// <summary>
+/// 線分を描画する
+/// </summary>
+/// <param name="position">始点</param>
+/// <param name="vector">終点</param>
+/// <param name="color">カラー</param>
 void EditorGizmo::DrawLine(const DirectX::SimpleMath::Vector3& position, const DirectX::SimpleMath::Vector3& vector, const DirectX::FXMVECTOR& color)
 {
 	// 頂点カラーを設定する
@@ -99,6 +126,13 @@ void EditorGizmo::DrawLine(const DirectX::SimpleMath::Vector3& position, const D
 }
 
 
+/// <summary>
+///線分の描画3D
+/// </summary>
+/// <param name="localStart">始点</param>
+/// <param name="localEnd">終点</param>
+/// <param name="world">ワールド行列</param>
+/// <param name="color">カラー</param>
 void EditorGizmo::DrawLine3D(
 	const DirectX::SimpleMath::Vector3& localStart,
 	const DirectX::SimpleMath::Vector3& localEnd,
@@ -120,7 +154,13 @@ void EditorGizmo::DrawLine3D(
 }
 
 
-// 円を描画する
+/// <summary>
+/// 円を描画する
+/// </summary>
+/// <param name="center">中心座標</param>
+/// <param name="radius">半径</param>
+/// <param name="color">カラー</param>
+/// <param name="split"></param>
 void EditorGizmo::DrawCircle(const DirectX::SimpleMath::Vector3& center, const float& radius, const DirectX::FXMVECTOR& color, const int& split)
 {
 	using namespace DirectX::SimpleMath;
@@ -140,7 +180,14 @@ void EditorGizmo::DrawCircle(const DirectX::SimpleMath::Vector3& center, const f
 	}
 }
 
-// 円を描画する
+/// <summary>
+/// 円を描画3D
+/// </summary>
+/// <param name="height">高さ</param>
+/// <param name="radius">半径</param>
+/// <param name="world">ワールド行列</param>
+/// <param name="color">カラー</param>
+/// <param name="split"></param>
 void EditorGizmo::DrawCircle3D(
 	float height,
 	float radius,
@@ -172,6 +219,13 @@ void EditorGizmo::DrawCircle3D(
 	}
 }
 
+/// <summary>
+/// ギズモ描画
+/// </summary>
+/// <param name="worldMatrix">ワールド行列</param>
+/// <param name="operation">オプション</param>
+/// <param name="mode">モード</param>
+/// <returns>変更後のワールド行列</returns>
 DirectX::SimpleMath::Matrix EditorGizmo::DrawManipulate(const DirectX::SimpleMath::Matrix& worldMatrix, ImGuizmo::OPERATION operation, ImGuizmo::MODE mode)
 {
 	float view[16], projection[16], world[16];
@@ -191,6 +245,9 @@ DirectX::SimpleMath::Matrix EditorGizmo::DrawManipulate(const DirectX::SimpleMat
 	return resultWorldMatirx;
 }
 
+/// <summary>
+/// グリッド描画
+/// </summary>
 void EditorGizmo::DrawGrid()
 {
 
@@ -215,10 +272,19 @@ void EditorGizmo::DrawGrid()
 }
 
 
+/// <summary>
+/// スフィアの描画
+/// </summary>
+/// <param name="center">中心座標</param>
+/// <param name="radius">半径</param>
 void EditorGizmo::DrawSphere(DirectX::SimpleMath::Vector3 center, float radius)
 {
+
 	DirectX::BoundingSphere sphere;
+
+	// 座標設定
 	sphere.Center = center;
+	// 反映設定
 	sphere.Radius = radius;
 
 	// スフィアを描画
@@ -226,13 +292,87 @@ void EditorGizmo::DrawSphere(DirectX::SimpleMath::Vector3 center, float radius)
 }
 
 
-// SimpleMathの Matrix を float[16]配列 に変換する
+/// <summary>
+/// コーンの描画
+/// </summary>
+/// <param name="position">座標</param>
+/// <param name="angle">角度</param>
+/// <param name="worldMatrix">ワールド行列</param>
+void EditorGizmo::DrawCone(const DirectX::SimpleMath::Vector3& position, const float& radius, const float& height, const float& angle, const DirectX::SimpleMath::Matrix& worldMatrix, const DirectX::FXMVECTOR& color)
+{
+
+	// === コーン底面の4方向のローカル起点 ===
+
+	DirectX::SimpleMath::Vector3 baseRight    = position + DirectX::SimpleMath::Vector3::Right    * radius;
+	DirectX::SimpleMath::Vector3 baseLeft     = position + DirectX::SimpleMath::Vector3::Left     * radius;
+	DirectX::SimpleMath::Vector3 baseForward  = position + DirectX::SimpleMath::Vector3::Forward  * radius;
+	DirectX::SimpleMath::Vector3 baseBackward = position + DirectX::SimpleMath::Vector3::Backward * radius;
+
+
+	// === コーン高さ方向へのベクトル（仮に上方向） ===
+
+	DirectX::SimpleMath::Vector3 coneUp = DirectX::SimpleMath::Vector3::Up * height;
+
+	// === コーン角度に応じた回転（各方向にコーン角を付加） ===
+
+	DirectX::SimpleMath::Quaternion rotRight    = DirectX::SimpleMath::Quaternion::CreateFromAxisAngle(DirectX::SimpleMath::Vector3::Forward,  DirectX::XMConvertToRadians(angle));
+	DirectX::SimpleMath::Quaternion rotLeft     = DirectX::SimpleMath::Quaternion::CreateFromAxisAngle(DirectX::SimpleMath::Vector3::Backward, DirectX::XMConvertToRadians(angle));
+	DirectX::SimpleMath::Quaternion rotForward  = DirectX::SimpleMath::Quaternion::CreateFromAxisAngle(DirectX::SimpleMath::Vector3::Left,     DirectX::XMConvertToRadians(angle));
+	DirectX::SimpleMath::Quaternion rotBackward = DirectX::SimpleMath::Quaternion::CreateFromAxisAngle(DirectX::SimpleMath::Vector3::Right,    DirectX::XMConvertToRadians(angle));
+
+
+	// === 各方向から coneHeight 方向へ伸ばした先端点 ===
+
+	DirectX::SimpleMath::Vector3 tipRight    = baseRight    + DirectX::SimpleMath::Vector3::Transform(coneUp, rotRight);
+	DirectX::SimpleMath::Vector3 tipLeft     = baseLeft     + DirectX::SimpleMath::Vector3::Transform(coneUp, rotLeft);
+	DirectX::SimpleMath::Vector3 tipForward  = baseForward  + DirectX::SimpleMath::Vector3::Transform(coneUp, rotForward);
+	DirectX::SimpleMath::Vector3 tipBackward = baseBackward + DirectX::SimpleMath::Vector3::Transform(coneUp, rotBackward);
+
+
+	// === 基底の円を描画する ===
+
+	this->DrawCircle3D(0.0f, radius , worldMatrix, color, 20);
+
+	// === 補助線の描画（ローカル座標をワールド変換で描画）===
+
+	this->DrawLine3D(baseRight   , tipRight   , worldMatrix, color);
+	this->DrawLine3D(baseLeft    , tipLeft    , worldMatrix, color);
+	this->DrawLine3D(baseForward , tipForward , worldMatrix, color);
+	this->DrawLine3D(baseBackward, tipBackward, worldMatrix, color);
+
+
+	// === 上の円の位置・半径を取得 ===
+
+	// Y方向の高さ（Up方向）
+	float topCenterY = tipRight.y;
+	// X方向の広がりを使用
+	float topRadiusX = std::abs(tipRight.x);
+
+
+	// === 上円を描画 ===
+
+	this->DrawCircle3D(topCenterY, topRadiusX, worldMatrix, color, 20);
+
+}
+
+
+
+
+/// <summary>
+/// SimpleMathの Matrix を float[16]配列 に変換する
+/// </summary>
+/// <param name="matrix">行列</param>
+/// <param name="mat">配列行列</param>
 void EditorGizmo::MatrixToFloatArrayColumnMajor(const DirectX::SimpleMath::Matrix& matrix, float* mat)
 {
 	memcpy(mat, &matrix, sizeof(float) * 16);
 }
 
-// SimpleMathの float[16]配列 を Matrix に変換する
+/// <summary>
+/// SimpleMathの float[16]配列 を Matrix に変換する
+/// </summary>
+/// <param name="matrix">行列</param>
+/// <param name="mat">配列行列</param>
 void EditorGizmo::FloatArrayToMatrixColumnMajor(DirectX::SimpleMath::Matrix* matrix, const float* mat)
 {
 	memcpy(matrix, mat, sizeof(DirectX::SimpleMath::Matrix));

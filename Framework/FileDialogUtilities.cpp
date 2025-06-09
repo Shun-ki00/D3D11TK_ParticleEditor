@@ -4,65 +4,57 @@
 #include <commdlg.h>
 #include <iostream>
 #include <fstream>
+#include <WICTextureLoader.h>
 
 
-// JSONファイルを開くダイアログ（1つ選択）
-std::string FileDialogUtilities::OpenJsonFile()
+/// <summary>
+/// テクスチャをロード取得する
+/// </summary>
+/// <param name="device">デバイス</param>
+/// <returns>テクスチャ</returns>
+Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> FileDialogUtilities::GetLoadTexture(ID3D11Device1* device)
 {
     // ファイル名バッファ
     char fileName[MAX_PATH] = "";
 
     // ファイルダイアログ構造体を初期化
     OPENFILENAMEA ofn = {};
-    // 構造体サイズ
     ofn.lStructSize = sizeof(ofn);
-    // 結果として選択されたファイルパスが入るバッファ
     ofn.lpstrFile = fileName;
-    // バッファのサイズ
     ofn.nMaxFile = MAX_PATH;
-
-    // ファイル選択時のフィルター
-    ofn.lpstrFilter = "JSON Files\0*.json\0All Files\0*.*\0";
-    // 最初のフィルターをデフォルト
+    ofn.lpstrFilter = "Image Files (*.png; *.jpg)\0*.png;*.jpg\0All Files (*.*)\0*.*\0";
     ofn.nFilterIndex = 1;
-    // 親ウィンドウ
-    ofn.hwndOwner = NULL;
-    ofn.Flags = OFN_PATHMUSTEXIST |  // パスが存在する必要あり
-        OFN_FILEMUSTEXIST;          // ファイルが存在する必要あり
+    ofn.hwndOwner = nullptr;
+    ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST;
 
-    // ファイルを開くダイアログを表示し、選択された場合のみファイルパスを返す
-    if (GetOpenFileNameA(&ofn)) {
-        return fileName;
-    }
-
-    // キャンセルやエラー時は空文字列を返す
-    return "";
-}
-
-// JSONファイルを保存するダイアログ（上書き確認あり）
-std::string FileDialogUtilities::SaveJsonFile()
-{
-    char filename[MAX_PATH] = "params.json";
-
-    OPENFILENAMEA ofn = {};
-
-    ofn.lStructSize = sizeof(ofn);
-
-    ofn.lpstrFile = filename;
-
-    ofn.nMaxFile = MAX_PATH;
-
-    ofn.lpstrFilter = "JSON Files\0*.json\0All Files\0*.*\0";
-
-    ofn.nFilterIndex = 1;
-
-    ofn.Flags = OFN_PATHMUSTEXIST | OFN_OVERWRITEPROMPT;
-
-    if (GetSaveFileNameA(&ofn)) 
+    // ユーザーがキャンセルした、または選択失敗
+    if (!GetOpenFileNameA(&ofn) || fileName[0] == '\0') 
     {
-        return filename;
+        return nullptr;
     }
 
-    // キャンセルやエラー時は空文字列を返す
-    return "";
+    // パスをwstringに変換
+    std::wstring wPath = FileDialogUtilities::ConvertToWString(fileName);
+
+    Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> texture;
+
+    HRESULT hr = DirectX::CreateWICTextureFromFile(
+        device,
+        wPath.c_str(),
+        nullptr,
+        texture.ReleaseAndGetAddressOf()
+    );
+
+    if (FAILED(hr))
+    {
+        // ロードに失敗した場合メッセージを表示
+        MessageBoxA(NULL, ("Failed to load texture:\n" + std::string(fileName)).c_str(),
+            "Texture Load Error", MB_ICONERROR);
+
+        // 失敗の場合nullを返す
+        return nullptr;
+    }
+
+    return texture;
 }
+

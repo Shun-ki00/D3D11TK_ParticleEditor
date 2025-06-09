@@ -9,7 +9,7 @@ public:
 	static float RandomFloat(float min, float max);
 
 	// コーン状のランダム生成
-	static DirectX::SimpleMath::Vector3 GenerateConeEmissio
+	static void GenerateConeEmissio
 	(
 		float coneAngleDeg,          // コーンの角度
 		float radius,            // コーンの半径
@@ -20,7 +20,7 @@ public:
 		DirectX::SimpleMath::Vector3& outVelocity);
 
 	// スフィア型のランダム
-	static DirectX::SimpleMath::Vector3 GenerateSphereEmission(
+	static void GenerateSphereEmission(
 		float sphereRadius,
 		bool emitFromShell,
 		const DirectX::SimpleMath::Vector3& center,

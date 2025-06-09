@@ -26,6 +26,8 @@ public:
 
 	// テクスチャを取得する
 	ID3D11ShaderResourceView* GetTexture() { return m_texture; }
+	// テクスチャを設定する
+	void SetTexture(ID3D11ShaderResourceView* texture) { m_texture = texture; }
 
 	// ワールド行列を取得する
 	DirectX::SimpleMath::Matrix GetWorldMatrix() const { return m_worldMatrix; }
@@ -55,35 +57,10 @@ public:
 
 	void Stop();
 
+	// === エディタ用追加関数 ===
+
+	// デバッグ描画
 	void DebugDraw();
-
-	void DebugWidnow();
-
-
-private:
-
-	// ランダム生成
-	float RandomFloat(float min, float max);
-
-	// コーン状のランダム生成
-	void GenerateConeEmission(
-		float coneAngleDeg,
-		float coneRadius,
-		float coneHeight,
-		bool emitFromShell,
-		const DirectX::SimpleMath::Vector3& coneOrigin,
-		const DirectX::SimpleMath::Vector3& coneDirection, // 必ず正規化して渡す
-		DirectX::SimpleMath::Vector3& outPosition,
-		DirectX::SimpleMath::Vector3& outVelocity);
-
-	// スフィア型のランダム
-	void GenerateSphereEmission(
-		float sphereRadius,
-		bool emitFromShell,
-		const DirectX::SimpleMath::Vector3& center,
-		float randomDirectionStrength,
-		DirectX::SimpleMath::Vector3& outPosition,
-		DirectX::SimpleMath::Vector3& outVelocity);
 
 private:
 

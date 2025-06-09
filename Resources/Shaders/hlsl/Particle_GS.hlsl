@@ -4,11 +4,19 @@ static const int vnum = 4;
 
 static const float4 offset_array[vnum] =
 {
-    float4(-0.2f,  0.2f, 0.0f, 0.0f), // 左上
-	float4( 0.2f,  0.2f, 0.0f, 0.0f), // 右上
-	float4(-0.2f, -0.2f, 0.0f, 0.0f), // 左下
-	float4( 0.2f, -0.2f, 0.0f, 0.0f), // 右下
+    float4(-0.5f,  0.5f, 0.0f, 0.0f), // 左上
+	float4( 0.5f,  0.5f, 0.0f, 0.0f), // 右上
+	float4(-0.5f, -0.5f, 0.0f, 0.0f), // 左下
+	float4( 0.5f, -0.5f, 0.0f, 0.0f), // 右下
 
+};
+
+static const float2 uv_array[vnum] =
+{
+    float2(0.0f, 0.0f), // 左上
+    float2(1.0f, 0.0f), // 右上
+    float2(0.0f, 1.0f), // 左下
+    float2(1.0f, 1.0f), // 右下
 };
 
 [maxvertexcount(vnum)]
@@ -31,15 +39,14 @@ void main(
         element.positionCS += mul(offset_array[i], m_billboardMatrix);
         
         // ビュー・プロジェクション変換
-        //element.positionCS = mul(element.positionCS, m_billboardMatrix);
         element.positionCS = mul(element.positionCS, m_viewMatrix);
         element.positionCS = mul(element.positionCS, m_projectionMatrix);
         
         // 色を取得
         element.color = input[0].color;
-        
-        element.uv = (offset_array[i].xy + 0.5f);
-        
+        // UV値を取得
+        element.uv = uv_array[i];
+
         // 頂点を出力ストリームに追加
         output.Append(element);
     }
