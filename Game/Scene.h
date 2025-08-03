@@ -65,6 +65,22 @@ private:
 	void DrawSubScene();
 
 
+	// ==== ImGuiウィンドウ作成 ===
+
+	// レイアウトを設定
+	void SetupMainLayout();
+	// シーンウィンドウ
+
+	// 値設定ウィンドウ
+
+	// メニューバー
+	void DrawMenuBar();
+
+	// ボタンウィンドウ
+
+
+
+
 private:
 
 	// 共有リソース

@@ -32,6 +32,9 @@
     <Filter Include="Shaders">
       <UniqueIdentifier>{6e9d9344-0dbf-4d65-b3b7-58761ec7b767}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Game\Scenes">
+      <UniqueIdentifier>{d9cef72f-624f-458c-aa84-ecf0699988f3}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="pch.h" />
@@ -120,6 +123,24 @@
     <ClInclude Include="Framework\RandomUtillities.h">
       <Filter>Framework</Filter>
     </ClInclude>
+    <ClInclude Include="imgui\imgui_toggle.h">
+      <Filter>imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="imgui\imgui_offset_rect.h">
+      <Filter>imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="imgui\imgui_toggle_math.h">
+      <Filter>imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="imgui\imgui_toggle_palette.h">
+      <Filter>imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="imgui\imgui_toggle_presets.h">
+      <Filter>imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="imgui\imgui_toggle_renderer.h">
+      <Filter>imgui</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="pch.cpp" />
@@ -187,6 +208,18 @@
     </ClCompile>
     <ClCompile Include="Framework\RandomUtillities.cpp">
       <Filter>Framework</Filter>
+    </ClCompile>
+    <ClCompile Include="imgui\imgui_toggle.cpp">
+      <Filter>imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="imgui\imgui_toggle_palette.cpp">
+      <Filter>imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="imgui\imgui_toggle_presets.cpp">
+      <Filter>imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="imgui\imgui_toggle_renderer.cpp">
+      <Filter>imgui</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

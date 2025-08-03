@@ -62,7 +62,6 @@ void Scene::Initialize()
 	m_sub->SetDevice(m_device);
 	m_sub->SetWindow(windowSize);
 
-
 	// 固定カメラのビュー行列作成
 	DirectX::SimpleMath::Vector3 eye(5.0f, 5.0f, 5.0f);
 	DirectX::SimpleMath::Vector3 target(0.0f, 0.0f, 0.0f);
@@ -120,37 +119,7 @@ void Scene::Update(const float& elapsedTime)
 void Scene::Render()
 {
 	// 基底のウィンドウを描画
-	ImGui::SetNextWindowSize(ImVec2(1280, 720), ImGuiCond_Always);
-	ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_Always);
-	ImGui::Begin("MainWindow", nullptr,
-		ImGuiWindowFlags_NoCollapse |
-		ImGuiWindowFlags_NoResize |
-		ImGuiWindowFlags_NoMove |
-		ImGuiWindowFlags_NoTitleBar |
-		ImGuiWindowFlags_NoBringToFrontOnFocus |
-		ImGuiWindowFlags_NoDocking);  // 親ウィンドウ自体はドッキング対象外
-
-	// DockSpace 設定（必要なら初期分割もここで）
-	ImGuiID dockspace_id = ImGui::GetID("MainWindowDockSpace");
-	ImGui::DockSpace(dockspace_id, ImVec2(0, 0),
-		ImGuiDockNodeFlags_None | ImGuiDockNodeFlags_PassthruCentralNode);
-
-	// Dock構成を初期化（初回のみ）
-	static bool dock_init = true;
-	if (dock_init)
-	{
-		dock_init = false;
-		ImGui::DockBuilderRemoveNode(dockspace_id);                   // clear
-		ImGui::DockBuilderAddNode(dockspace_id, ImGuiDockNodeFlags_DockSpace);
-		ImGui::DockBuilderSetNodeSize(dockspace_id, ImVec2(1280, 720));
-
-		ImGuiID dock_main_id = dockspace_id;
-		ImGuiID dock_id_left = ImGui::DockBuilderSplitNode(dock_main_id, ImGuiDir_Left, 0.75f, nullptr, &dock_main_id);
-		ImGuiID dock_id_right = dock_main_id;
-	}
-
-	ImGui::End();
-
+	this->SetupMainLayout();
 
 	// メインシーンの描画
 	this->DrawMainScene();
@@ -168,6 +137,201 @@ void Scene::Render()
 void Scene::Finalize()
 {
 }
+
+
+void Scene::SetupMainLayout()
+{
+	// 既定のウィンドウを描画
+	ImGui::SetNextWindowSize(ImVec2(1280, 720), ImGuiCond_Always);
+	ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_Always);
+	ImGui::Begin("ParticleEditor", nullptr,
+		ImGuiWindowFlags_NoCollapse |
+		ImGuiWindowFlags_NoResize |
+		ImGuiWindowFlags_NoMove |
+		ImGuiWindowFlags_NoTitleBar |
+		ImGuiWindowFlags_NoBringToFrontOnFocus |
+		ImGuiWindowFlags_NoDocking ); // メニューバー有効
+
+	// メニューバーの描画
+	this->DrawMenuBar();
+
+	// DockSpace設定
+	ImGuiID dockspacecId = ImGui::GetID("ParticleEditorDockSpace");
+	ImGui::DockSpace(dockspacecId, ImVec2(0, 0),
+		ImGuiDockNodeFlags_None | ImGuiDockNodeFlags_PassthruCentralNode);
+
+
+	// Dock構成を初期化
+	static bool dockInit = true;
+	if (dockInit)
+	{
+		dockInit = false;
+
+		// 既存のドックレイアウトをクリア
+		ImGui::DockBuilderRemoveNode(dockspacecId);
+		ImGui::DockBuilderAddNode(dockspacecId, ImGuiDockNodeFlags_DockSpace);
+		ImGui::DockBuilderSetNodeSize(dockspacecId, ImVec2(1280, 720));
+
+		ImGuiID mainId = dockspacecId;
+
+		// 右側にパーティクル設定ウィンドウ(30%)
+		ImGuiID dockIdRight = ImGui::DockBuilderSplitNode(mainId, ImGuiDir_Right, 0.30f, nullptr, &mainId);
+		// 残りを上下に分割（シーンビュー70%、コントロール30%）
+		ImGuiID dockIdScene = ImGui::DockBuilderSplitNode(mainId, ImGuiDir_Up, 0.75f, nullptr, &mainId);
+		ImGuiID dockIdControl = mainId;
+
+		// 各ウィンドウを配置
+		ImGui::DockBuilderDockWindow("Scene", dockIdScene);
+		ImGui::DockBuilderDockWindow("ParticleSettings", dockIdRight);
+		ImGui::DockBuilderDockWindow("Controls", dockIdControl);
+
+		// ドッキングレイアウトを完了
+		ImGui::DockBuilderFinish(dockspacecId);
+	}
+
+	ImGui::End();
+}
+
+
+void Scene::DrawMenuBar()
+{
+	// カスタムメニューバーの高さ設定
+	const float menuBarHeight = 40.0f;
+	const float buttonHeight = 30.0f;
+	const float buttonSpacing = 8.0f;
+
+	// メニューバーエリアを手動で作成
+	ImVec2 menuBarPos = ImGui::GetCursorScreenPos();
+	ImVec2 menuBarSize = ImVec2(ImGui::GetContentRegionAvail().x, menuBarHeight);
+
+	// メニューバー背景を描画
+	ImDrawList* drawList = ImGui::GetWindowDrawList();
+	drawList->AddRectFilled(menuBarPos,
+		ImVec2(menuBarPos.x + menuBarSize.x, menuBarPos.y + menuBarSize.y),
+		IM_COL32(45, 45, 48, 255)); // ダークグレー背景
+
+	// ボタン配置用のカーソル位置設定
+	ImGui::SetCursorPosY(ImGui::GetCursorPosY() + (menuBarHeight - buttonHeight) * 0.5f);
+	ImGui::SetCursorPosX(ImGui::GetCursorPosX() + buttonSpacing);
+
+	// ボタンのスタイル設定
+	ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 4.0f);
+	ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(12, 6));
+
+	// ファイル操作ボタン群
+	if (ImGui::Button(u8"新規作成"))
+	{
+		// 新規パーティクル作成
+	}
+	ImGui::SameLine(0, buttonSpacing);
+
+	if (ImGui::Button(u8"開く"))
+	{
+		// パーティクルファイル読み込み
+	}
+	ImGui::SameLine(0, buttonSpacing);
+
+	if (ImGui::Button(u8"保存"))
+	{
+		// パーティクルファイル保存
+	}
+	ImGui::SameLine(0, buttonSpacing);
+
+	if (ImGui::Button(u8"名前を付けて保存"))
+	{
+		// 名前を付けて保存
+	}
+	ImGui::SameLine(0, buttonSpacing);
+
+	// セパレータ（縦線）
+	ImVec2 separatorPos = ImGui::GetCursorScreenPos();
+	separatorPos.y -= 5;
+	drawList->AddLine(separatorPos,
+		ImVec2(separatorPos.x, separatorPos.y + buttonHeight + 10),
+		IM_COL32(100, 100, 100, 255), 1.0f);
+	ImGui::SameLine(0, buttonSpacing * 2);
+
+	// テクスチャ操作ボタン
+	ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.4f, 0.7f, 1.0f));
+	if (ImGui::Button(u8"テクスチャを開く"))
+	{
+		// テクスチャファイル読み込み
+	}
+	ImGui::PopStyleColor();
+	ImGui::SameLine(0, buttonSpacing);
+
+	// 編集操作ボタン群
+	if (ImGui::Button(u8"元に戻す"))
+	{
+		// Undo操作
+	}
+	ImGui::SameLine(0, buttonSpacing);
+
+	if (ImGui::Button(u8"やり直し"))
+	{
+		// Redo操作
+	}
+	ImGui::SameLine(0, buttonSpacing);
+
+	// もう一つのセパレータ
+	separatorPos = ImGui::GetCursorScreenPos();
+	separatorPos.y -= 5;
+	drawList->AddLine(separatorPos,
+		ImVec2(separatorPos.x, separatorPos.y + buttonHeight + 10),
+		IM_COL32(100, 100, 100, 255), 1.0f);
+	ImGui::SameLine(0, buttonSpacing * 2);
+
+	// 表示切り替えボタン群
+	static bool showGrid = true;
+	static bool showAxis = true;
+
+	// トグルボタンのスタイル
+	if (showGrid)
+		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.3f, 0.6f, 0.3f, 1.0f));
+	else
+		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.4f, 0.4f, 0.4f, 1.0f));
+
+	if (ImGui::Button(u8"グリッド"))
+	{
+		showGrid = !showGrid;
+	}
+	ImGui::PopStyleColor();
+	ImGui::SameLine(0, buttonSpacing);
+
+	if (showAxis)
+		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.3f, 0.6f, 0.3f, 1.0f));
+	else
+		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.4f, 0.4f, 0.4f, 1.0f));
+
+	if (ImGui::Button(u8"軸表示"))
+	{
+		showAxis = !showAxis;
+	}
+	ImGui::PopStyleColor();
+	ImGui::SameLine(0, buttonSpacing);
+
+	// 右端にヘルプボタン
+	float helpButtonWidth = 80.0f;
+	float availableWidth = ImGui::GetContentRegionAvail().x;
+	if (availableWidth > helpButtonWidth + buttonSpacing)
+	{
+		ImGui::SameLine(0, availableWidth - helpButtonWidth);
+		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.6f, 0.4f, 0.2f, 1.0f));
+		if (ImGui::Button(u8"ヘルプ"))
+		{
+			// ヘルプ表示
+		}
+		ImGui::PopStyleColor();
+	}
+
+	ImGui::PopStyleVar(2); // FrameRounding, FramePadding
+
+	// メニューバーの高さ分だけカーソルを進める
+	ImGui::SetCursorPosY(ImGui::GetCursorPosY() + (menuBarHeight - buttonHeight) * 0.5f + 5);
+}
+
+
+
 
 /// <summary>
 /// メインシーンを描画する
@@ -414,40 +578,40 @@ void Scene::ParticleDataEditor()
 {
 	ImGui::Begin("Particle Parameters Editor");
 
-	// メニューバーの開始
-	if (ImGui::BeginMainMenuBar())
-	{
-		if (ImGui::BeginMenu("File"))
-		{
-			if (ImGui::MenuItem("Load from JSON"))
-			{
-				// 読み込めたときだけ代入
-				if (auto parametersOpt = FileDialogUtilities::OpenJsonFile<ParticleParameters>()) {
-					m_parametersData = *parametersOpt; 
-				}
-			}
+	//// メニューバーの開始
+	//if (ImGui::BeginMainMenuBar())
+	//{
+	//	if (ImGui::BeginMenu("File"))
+	//	{
+	//		if (ImGui::MenuItem("Load from JSON"))
+	//		{
+	//			// 読み込めたときだけ代入
+	//			if (auto parametersOpt = FileDialogUtilities::OpenJsonFile<ParticleParameters>()) {
+	//				m_parametersData = *parametersOpt; 
+	//			}
+	//		}
 
-			if (ImGui::MenuItem("Save to JSON"))
-			{
-				// JSONセーブ処理
-				FileDialogUtilities::SaveJsonFile<ParticleParameters>(m_parametersData);
-			}
+	//		if (ImGui::MenuItem("Save to JSON"))
+	//		{
+	//			// JSONセーブ処理
+	//			FileDialogUtilities::SaveJsonFile<ParticleParameters>(m_parametersData);
+	//		}
 
-			if (ImGui::MenuItem("Load Texture"))
-			{
-				// テクスチャロード処理
-				Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> texture = FileDialogUtilities::GetLoadTexture(m_device);
+	//		if (ImGui::MenuItem("Load Texture"))
+	//		{
+	//			// テクスチャロード処理
+	//			Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> texture = FileDialogUtilities::GetLoadTexture(m_device);
 
-				// nullptrで無ければ格納
-				if (texture != nullptr)
-					// テクスチャを格納する
-					m_textures.push_back(std::move(texture));
-			}
+	//			// nullptrで無ければ格納
+	//			if (texture != nullptr)
+	//				// テクスチャを格納する
+	//				m_textures.push_back(std::move(texture));
+	//		}
 
-			ImGui::EndMenu();
-		}
-		ImGui::EndMainMenuBar();
-	}
+	//		ImGui::EndMenu();
+	//	}
+	//	ImGui::EndMainMenuBar();
+	//}
 
 
 	// float入力
@@ -479,6 +643,8 @@ void Scene::ParticleDataEditor()
 
 	// Vector4 入力
 	ImGui::InputFloat4("Start Color", &m_parametersData.startColor.x);
+
+	
 
 
 

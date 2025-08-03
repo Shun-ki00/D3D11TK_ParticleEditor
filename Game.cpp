@@ -96,9 +96,9 @@ void Game::Initialize(HWND window, int width, int height)
     // ドッキング有効化
     io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
     // 日本語対応
-	/*ImFontConfig config;
+	ImFontConfig config;
     config.FontDataOwnedByAtlas = false;
-	io.Fonts->AddFontFromFileTTF("C:\\Windows\\Fonts\\meiryo.ttc", 20.0f, &config, io.Fonts->GetGlyphRangesJapanese());*/
+	io.Fonts->AddFontFromFileTTF("C:\\Windows\\Fonts\\meiryo.ttc", 20.0f, &config, io.Fonts->GetGlyphRangesJapanese());
 	
     //  Win32用の初期化
     ImGui_ImplWin32_Init(window);
