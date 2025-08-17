@@ -12,6 +12,9 @@ public:
 
     // テクスチャをロードして取得する
     static Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> GetLoadTexture(ID3D11Device1* device);
+
+    // 直前に開いたファイルパスを取得する
+    static std::string GetFilePath() { return s_filePath; }
 	
     // JSONファイルを開いてロード
     template<typename T>
@@ -41,6 +44,9 @@ public:
         try {
             nlohmann::json j;
             file >> j;
+
+            // 現在開いているファイルパスを保存
+            s_filePath = fileName;
 
             return j.get<T>();
         }
@@ -96,4 +102,9 @@ public:
 	static std::wstring ConvertToWString(const std::string& str) {
 		return std::wstring(str.begin(), str.end());
 	};
+
+private:
+
+    static std::string s_filePath;
+
 };

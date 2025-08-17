@@ -30,3 +30,7 @@
 *.exe
 *.out
 *.app
+.vs/
+D3D11TK_.19c96723/
+packages/
+x64/

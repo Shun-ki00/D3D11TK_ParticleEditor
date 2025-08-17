@@ -6,6 +6,7 @@
 #include <fstream>
 #include <WICTextureLoader.h>
 
+std::string FileDialogUtilities::s_filePath = "";
 
 /// <summary>
 /// テクスチャをロード取得する
@@ -57,4 +58,3 @@ Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> FileDialogUtilities::GetLoadTex
 
     return texture;
 }
-

@@ -80,6 +80,11 @@ public:
 		return m_up;
 	}
 
+	// マウスホイールの回転数をリセット
+	void ResetScrollWheelValue() 
+	{
+		DirectX::Mouse::Get().ResetScrollWheelValue();
+	}
 
 private:
 	// 変位を計測する

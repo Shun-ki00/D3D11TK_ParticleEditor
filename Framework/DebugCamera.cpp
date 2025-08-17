@@ -59,8 +59,6 @@ void DebugCamera::Initialize(int screenWidth,int screenHeight)
 /// </summary>
 void DebugCamera::Update()
 {
-	
-
 	// マウスの状態を取得する
 	m_mouse_state = DirectX::Mouse::Get().GetState();
 	// マウスステートトラッカーを更新する

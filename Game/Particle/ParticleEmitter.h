@@ -60,7 +60,7 @@ public:
 	// === エディタ用追加関数 ===
 
 	// デバッグ描画
-	void DebugDraw();
+	void DebugDraw(const bool& isActive);
 
 private:
 

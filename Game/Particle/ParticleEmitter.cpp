@@ -30,7 +30,7 @@ void ParticleEmitter::Initialize()
     m_editorGizmo = std::make_unique<EditorGizmo>();
     m_editorGizmo->Initialize();
 
-    m_worldMatrix = DirectX::SimpleMath::Matrix::CreateTranslation(DirectX::SimpleMath::Vector3::Up * 3.0f);
+    m_worldMatrix = DirectX::SimpleMath::Matrix::CreateTranslation(DirectX::SimpleMath::Vector3::Zero);
 }
 
 
@@ -95,51 +95,70 @@ void ParticleEmitter::Stop()
   
 }
 
-void ParticleEmitter::DebugDraw()
+void ParticleEmitter::DebugDraw(const bool& isActive)
 {
 
     DirectX::SimpleMath::Vector3 centerSphere = DirectX::SimpleMath::Vector3::Transform(m_particleParameters.sphereCenter, m_worldMatrix);
     DirectX::SimpleMath::Vector3 centerCone = DirectX::SimpleMath::Vector3::Transform(m_particleParameters.conePosition, m_worldMatrix);
 
-    // プリミティブバッチの開始
-    m_editorGizmo->DrawPrimitiveBegin();
-    switch (m_shape)
+    // アクティブの場合軸を描画する
+    if (isActive)
     {
-    case ParticleEmitter::Shape::CONE:
+        m_editorGizmo->DrawPrimitiveBegin();
+        switch (m_shape)
+        {
+        case ParticleEmitter::Shape::CONE:
 
-        // コーンを描画する
-        m_editorGizmo->DrawCone(
-            DirectX::SimpleMath::Vector3::Zero,
-            m_particleParameters.coneRadius,
-            m_particleParameters.coneHeight,
-            m_particleParameters.coneAngle,
-            m_worldMatrix, DirectX::Colors::Blue);
+            // コーンを描画する
+            m_editorGizmo->DrawCone(
+                DirectX::SimpleMath::Vector3::Zero,
+                m_particleParameters.coneRadius,
+                m_particleParameters.coneHeight,
+                m_particleParameters.coneAngle,
+                m_worldMatrix, DirectX::Colors::Blue);
 
-        break;
-    case ParticleEmitter::Shape::SPHERE:
+            break;
+        case ParticleEmitter::Shape::SPHERE:
 
-        // スフィアの描画
-        m_editorGizmo->DrawSphere(centerSphere, m_particleParameters.sphereRadius);
+            // スフィアの描画
+            m_editorGizmo->DrawSphere(centerSphere, m_particleParameters.sphereRadius);
 
-        break;
-    default:
-        break;
+            break;
+        default:
+            break;
+        }
+        // プリミティブバッチの終了
+        m_editorGizmo->DrawPrimitiveEnd();
     }
-
-    // プリミティブバッチの終了
-    m_editorGizmo->DrawPrimitiveEnd();
-
+   
    // ギズモ操作による移動を適用し、ワールド行列を更新
+    ImVec2 pos = ImGui::GetWindowPos();
+    ImVec2 size = ImGui::GetWindowSize();
+    ImGuizmo::SetRect(pos.x, pos.y, size.x, size.y);
+ 
    m_worldMatrix =
        m_editorGizmo->DrawManipulate(m_worldMatrix, ImGuizmo::OPERATION::TRANSLATE , ImGuizmo::MODE::WORLD);
 
+
    // ウィンドウ開始
-   ImGui::Begin("ParticleEmitter");
+   ImGui::SetNextWindowSize(ImVec2(958, 124), ImGuiCond_Always);
+   ImGui::SetNextWindowPos(ImVec2(0,649), ImGuiCond_Always);
+   ImGui::Begin("ParticleEmitter",nullptr,
+       ImGuiWindowFlags_NoCollapse |
+       ImGuiWindowFlags_NoResize |
+       ImGuiWindowFlags_NoMove |
+       ImGuiWindowFlags_NoTitleBar |
+       ImGuiWindowFlags_NoDocking);
 
    // プレイボタン
    ImGui::Button("Play");
+
+   ImGui::SameLine();
+
    // ストップボタン
    ImGui::Button("Stop");
+
+   ImGui::SameLine();
 
    static int index = 0;
 
@@ -151,6 +170,7 @@ void ParticleEmitter::DebugDraw()
    catItems.push_back(cone.c_str());
    catItems.push_back(Sphere.c_str());
 
+   ImGui::SetNextItemWidth(120);
    ImGui::Combo("Category", &index, catItems.data(), catItems.size());
 
    if (index == 0)
@@ -161,7 +181,6 @@ void ParticleEmitter::DebugDraw()
    {
        m_shape = Shape::SPHERE;
    }
-
 
    // ウィンドウ終了
    ImGui::End();

@@ -7,9 +7,19 @@
 #include "Framework/FileDialogUtilities.h"
 #include "Game/Parameters/ParameterBuffers.h"
 #include "Game/Particle/ParticleEmitter.h"
+#include "imgui/imgui_toggle.h"
 
 
 const int Scene::MAX_PARTICLE_VERTEX_COUNT = 700;
+
+const ImVec2 Scene::MAIN_WINDOW_POSITION = { 0, 0 };
+const ImVec2 Scene::MAIN_WINDOW_SIZE = { 1280, 720 };
+
+const ImVec2 Scene::SCENE_WINDOW_POSITION = { 0, 50 };
+const ImVec2 Scene::SCENE_WINDOW_SIZE     = { 958, 596 };
+
+const ImVec2 Scene::PARTICLE_SETTINGS_WINDOW_POSITION = { 959, 50 };
+const ImVec2 Scene::PARTICLE_SETTINGS_WINDOW_SIZE = { 322, 669 };
 
 /// <summary>
 /// コンストラクタ
@@ -22,11 +32,9 @@ Scene::Scene()
 	m_commonStates{},
 	m_gridMatrix{},
 	m_arrayGridMatrix{},
-	m_cameraDistance{},
-	m_mainViewMatrix{},
+	m_debugCamera{},
 	m_main{},
 	m_sub{},
-	m_fixedViewMatrix{},
 	m_particleEmitter{},
 	m_particleiInputLayout{},
 	m_particleConstBuffer{},
@@ -53,6 +61,10 @@ void Scene::Initialize()
 	// スクリーンサイズを取得する
 	const RECT windowSize = m_commonResources->GetDeviceResources()->GetOutputSize();
 
+	// デバッグカメラの作成
+	m_debugCamera = std::make_unique<DebugCamera>();
+	m_debugCamera->Initialize(windowSize.right, windowSize.bottom);
+
 	// レンダーテクスチャを作成する
 	m_main = std::make_unique<DX::RenderTexture>(DXGI_FORMAT_R8G8B8A8_UNORM);
 	m_main->SetDevice(m_device);
@@ -62,26 +74,12 @@ void Scene::Initialize()
 	m_sub->SetDevice(m_device);
 	m_sub->SetWindow(windowSize);
 
-	// 固定カメラのビュー行列作成
-	DirectX::SimpleMath::Vector3 eye(5.0f, 5.0f, 5.0f);
-	DirectX::SimpleMath::Vector3 target(0.0f, 0.0f, 0.0f);
-	DirectX::SimpleMath::Vector3 up(0.0f, 1.0f, 0.0f);
-	m_fixedViewMatrix = DirectX::SimpleMath::Matrix::CreateLookAt(eye, target, up);
-
-	// デバッグカメラのビュー行列
-	m_cameraDistance = 10.0f;
-	eye    = { 1.0f , 1.0f, 1.0f };
-	eye *= m_cameraDistance;
-	target = { 0.0f, 0.0f, 0.0f };
-	m_mainViewMatrix = DirectX::SimpleMath::Matrix::CreateLookAt(eye, target, up);
-
 	// グリッドのワールド行列作成
 	m_gridMatrix = DirectX::SimpleMath::Matrix::Identity;
 	EditorGizmo::MatrixToFloatArrayColumnMajor(m_gridMatrix, m_arrayGridMatrix);
 
 	// シェーダー、バッファの作成
 	this->CreateShaderAndBuffer();
-
 
 	// パラメータのデータをロードする
 	std::ifstream file("Resources/Json/Effect.json");
@@ -111,6 +109,12 @@ void Scene::Update(const float& elapsedTime)
 {
 	// パーティクルの更新
 	m_particleEmitter->Update(elapsedTime);
+
+	// Sceneウィンドウに触れている時だけカメラを更新する
+	if (m_sceneAllowCameraInput)
+	{
+		m_debugCamera->Update();
+	}
 }
 
 /// <summary>
@@ -120,13 +124,8 @@ void Scene::Render()
 {
 	// 基底のウィンドウを描画
 	this->SetupMainLayout();
-
 	// メインシーンの描画
 	this->DrawMainScene();
-	// サブシーンの描画
-	this->DrawSubScene();
-	
-
 	// パーティクルデータの編集
 	this->ParticleDataEditor();
 }
@@ -138,19 +137,21 @@ void Scene::Finalize()
 {
 }
 
-
+/// <summary>
+/// 基底のウィンドウのレイアウト設定
+/// </summary>
 void Scene::SetupMainLayout()
 {
 	// 既定のウィンドウを描画
-	ImGui::SetNextWindowSize(ImVec2(1280, 720), ImGuiCond_Always);
-	ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_Always);
+	ImGui::SetNextWindowSize(MAIN_WINDOW_SIZE, ImGuiCond_Always);
+	ImGui::SetNextWindowPos(MAIN_WINDOW_POSITION, ImGuiCond_Always);
 	ImGui::Begin("ParticleEditor", nullptr,
 		ImGuiWindowFlags_NoCollapse |
 		ImGuiWindowFlags_NoResize |
 		ImGuiWindowFlags_NoMove |
 		ImGuiWindowFlags_NoTitleBar |
 		ImGuiWindowFlags_NoBringToFrontOnFocus |
-		ImGuiWindowFlags_NoDocking ); // メニューバー有効
+		ImGuiWindowFlags_NoDocking );
 
 	// メニューバーの描画
 	this->DrawMenuBar();
@@ -160,35 +161,6 @@ void Scene::SetupMainLayout()
 	ImGui::DockSpace(dockspacecId, ImVec2(0, 0),
 		ImGuiDockNodeFlags_None | ImGuiDockNodeFlags_PassthruCentralNode);
 
-
-	// Dock構成を初期化
-	static bool dockInit = true;
-	if (dockInit)
-	{
-		dockInit = false;
-
-		// 既存のドックレイアウトをクリア
-		ImGui::DockBuilderRemoveNode(dockspacecId);
-		ImGui::DockBuilderAddNode(dockspacecId, ImGuiDockNodeFlags_DockSpace);
-		ImGui::DockBuilderSetNodeSize(dockspacecId, ImVec2(1280, 720));
-
-		ImGuiID mainId = dockspacecId;
-
-		// 右側にパーティクル設定ウィンドウ(30%)
-		ImGuiID dockIdRight = ImGui::DockBuilderSplitNode(mainId, ImGuiDir_Right, 0.30f, nullptr, &mainId);
-		// 残りを上下に分割（シーンビュー70%、コントロール30%）
-		ImGuiID dockIdScene = ImGui::DockBuilderSplitNode(mainId, ImGuiDir_Up, 0.75f, nullptr, &mainId);
-		ImGuiID dockIdControl = mainId;
-
-		// 各ウィンドウを配置
-		ImGui::DockBuilderDockWindow("Scene", dockIdScene);
-		ImGui::DockBuilderDockWindow("ParticleSettings", dockIdRight);
-		ImGui::DockBuilderDockWindow("Controls", dockIdControl);
-
-		// ドッキングレイアウトを完了
-		ImGui::DockBuilderFinish(dockspacecId);
-	}
-
 	ImGui::End();
 }
 
@@ -197,7 +169,7 @@ void Scene::DrawMenuBar()
 {
 	// カスタムメニューバーの高さ設定
 	const float menuBarHeight = 40.0f;
-	const float buttonHeight = 30.0f;
+	const float buttonHeight  = 30.0f;
 	const float buttonSpacing = 8.0f;
 
 	// メニューバーエリアを手動で作成
@@ -228,18 +200,32 @@ void Scene::DrawMenuBar()
 	if (ImGui::Button(u8"開く"))
 	{
 		// パーティクルファイル読み込み
+		m_parametersData = FileDialogUtilities::OpenJsonFile<ParticleParameters>().value();
 	}
 	ImGui::SameLine(0, buttonSpacing);
 
 	if (ImGui::Button(u8"保存"))
 	{
-		// パーティクルファイル保存
+		// パラメータをjson型に変換
+		nlohmann::json j = m_parametersData;
+
+		// ファイルパスを指定する
+		std::ofstream out(FileDialogUtilities::GetFilePath());
+		// ファイルを開く
+		out.is_open();
+		// 整形して書き込む
+		out << j.dump(4); 	
 	}
 	ImGui::SameLine(0, buttonSpacing);
 
 	if (ImGui::Button(u8"名前を付けて保存"))
 	{
 		// 名前を付けて保存
+		FileDialogUtilities::SaveJsonFile<ParticleParameters>(m_parametersData);
+
+		// 保存完了
+		MessageBoxA(NULL, "保存完了",
+			"Save", MB_ICONERROR);
 	}
 	ImGui::SameLine(0, buttonSpacing);
 
@@ -256,6 +242,7 @@ void Scene::DrawMenuBar()
 	if (ImGui::Button(u8"テクスチャを開く"))
 	{
 		// テクスチャファイル読み込み
+		m_textures.push_back(FileDialogUtilities::GetLoadTexture(m_device));
 	}
 	ImGui::PopStyleColor();
 	ImGui::SameLine(0, buttonSpacing);
@@ -281,47 +268,30 @@ void Scene::DrawMenuBar()
 		IM_COL32(100, 100, 100, 255), 1.0f);
 	ImGui::SameLine(0, buttonSpacing * 2);
 
-	// 表示切り替えボタン群
-	static bool showGrid = true;
-	static bool showAxis = true;
-
-	// トグルボタンのスタイル
-	if (showGrid)
-		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.3f, 0.6f, 0.3f, 1.0f));
-	else
-		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.4f, 0.4f, 0.4f, 1.0f));
-
-	if (ImGui::Button(u8"グリッド"))
-	{
-		showGrid = !showGrid;
-	}
-	ImGui::PopStyleColor();
+	// トグルボタン グリッド
+	static bool gridValues[] = { true, true, true, true, true, true, true, true };
+	size_t gridValueIndex = 0;
+	ImGui::Toggle(u8"グリッド", &gridValues[gridValueIndex++], ImGuiToggleFlags_Animated);
+	ImGui::SameLine(0, buttonSpacing);
+	// トグルボタン 軸
+	static bool axisValues[] = { true, true, true, true, true, true, true, true };
+	size_t axisValueIndex = 0;
+	ImGui::Toggle(u8"軸表示", &axisValues[axisValueIndex++], ImGuiToggleFlags_Animated);
 	ImGui::SameLine(0, buttonSpacing);
 
-	if (showAxis)
-		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.3f, 0.6f, 0.3f, 1.0f));
-	else
-		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.4f, 0.4f, 0.4f, 1.0f));
-
-	if (ImGui::Button(u8"軸表示"))
-	{
-		showAxis = !showAxis;
-	}
-	ImGui::PopStyleColor();
-	ImGui::SameLine(0, buttonSpacing);
+	// グリッドのアクティブ設定を行う
+	m_isGridActive = gridValues[0];
+	// 軸のアクティブ設定を行う
+	m_isAxisActive = axisValues[0];
 
 	// 右端にヘルプボタン
+	// ヘルプボタンの代わりにダミーのスペースでレイアウト維持
 	float helpButtonWidth = 80.0f;
 	float availableWidth = ImGui::GetContentRegionAvail().x;
 	if (availableWidth > helpButtonWidth + buttonSpacing)
 	{
 		ImGui::SameLine(0, availableWidth - helpButtonWidth);
-		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.6f, 0.4f, 0.2f, 1.0f));
-		if (ImGui::Button(u8"ヘルプ"))
-		{
-			// ヘルプ表示
-		}
-		ImGui::PopStyleColor();
+		ImGui::Dummy(ImVec2(helpButtonWidth, buttonHeight));
 	}
 
 	ImGui::PopStyleVar(2); // FrameRounding, FramePadding
@@ -342,13 +312,13 @@ void Scene::DrawMainScene()
 	auto rtv = m_main->GetRenderTargetView();
 	auto dsv = m_commonResources->GetDeviceResources()->GetDepthStencilView();
 
-	// オフスクリーン描画クリア
+	// オフスクリーン描画クリア	
 	m_context->ClearRenderTargetView(rtv, DirectX::Colors::DarkGray);
 	m_context->ClearDepthStencilView(dsv, D3D11_CLEAR_DEPTH, 1.0f, 0);
 	m_context->OMSetRenderTargets(1, &rtv, dsv);
 
 	// カメラ情報の取得
-	DirectX::SimpleMath::Matrix viewMatrix       = m_mainViewMatrix;
+	DirectX::SimpleMath::Matrix viewMatrix       = m_debugCamera->GetViewMatrix();
 	DirectX::SimpleMath::Matrix projectionMatrix = m_commonResources->GetProjectionMatrix();
 
 
@@ -356,119 +326,93 @@ void Scene::DrawMainScene()
 	EditorGizmo::MatrixToFloatArrayColumnMajor(viewMatrix, viewArrayMatrix);
 	EditorGizmo::MatrixToFloatArrayColumnMajor(projectionMatrix, projectionArrayMatrix);
 
-	// --- ImGuiウィンドウ内での描画開始 ---
-	ImGui::Begin("Scene View", nullptr, ImGuiWindowFlags_None);
+
+	ImGui::SetNextWindowPos(SCENE_WINDOW_POSITION, ImGuiCond_Always);
+	ImGui::SetNextWindowSize(SCENE_WINDOW_SIZE, ImGuiCond_Always);
+	ImGui::Begin("Scene", nullptr,
+		ImGuiWindowFlags_NoResize |
+		ImGuiWindowFlags_NoMove |
+		ImGuiWindowFlags_NoCollapse |
+		ImGuiWindowFlags_NoDocking |
+		ImGuiWindowFlags_NoScrollbar |
+		ImGuiWindowFlags_NoScrollWithMouse);
+
+	// Sceneウィンドウにフォーカスがあって、マウスがUIに奪われていない時だけカメラ入力許可
+	auto io = ImGui::GetIO();
+	bool allow = false;
+
+	ImVec2 winPos = ImGui::GetWindowPos();
+	ImVec2 regionMin = ImGui::GetWindowContentRegionMin();
+	ImVec2 regionMax = ImGui::GetWindowContentRegionMax();
+	ImVec2 gizmoPos = { winPos.x + regionMin.x, winPos.y + regionMin.y };
+	ImVec2 gizmoSize = { regionMax.x - regionMin.x, regionMax.y - regionMin.y };
+
+	ImVec2 mousePos = io.MousePos;
+
+	bool mouseInScene =
+		(mousePos.x >= gizmoPos.x && mousePos.x < gizmoPos.x + gizmoSize.x) &&
+		(mousePos.y >= gizmoPos.y && mousePos.y < gizmoPos.y + gizmoSize.y);
+
+	if (mouseInScene) {
+		// Scene内にマウスあり
+		allow = true;
+	}
 
 
-	ImVec2 windowPos = ImGui::GetWindowPos();
-	ImVec2 cursorPos = ImGui::GetCursorPos();
-	ImVec2 screenPos = ImVec2(windowPos.x + cursorPos.x, windowPos.y + cursorPos.y);
-	ImVec2 contentSize = ImGui::GetContentRegionAvail();
-	// この領域ではウィンドウ移動を無効化
-	ImGui::SetWindowHitTestHole(ImGui::GetCurrentWindow(), ImVec2(screenPos.x, screenPos.y), ImVec2(contentSize));
+	ImVec2 windowPos = ImGui::GetWindowPos(); // スクリーン座標
+	regionMin = ImGui::GetWindowContentRegionMin(); // ローカル座標
+	regionMax = ImGui::GetWindowContentRegionMax(); // ローカル座標
 
-	// ギズモ用描画範囲を設定
-	ImGuizmo::SetRect(screenPos.x, screenPos.y, contentSize.x, contentSize.y);
+	// ギズモ描画のスクリーン範囲
+	ImVec2 screenPos = ImVec2(windowPos.x + regionMin.x, windowPos.y + regionMin.y);
+	ImVec2 screenSize = ImVec2(regionMax.x - regionMin.x, regionMax.y - regionMin.y);
+
+	// ウィンドウ移動を無効化（ここも修正）
+	ImGui::SetWindowHitTestHole(ImGui::GetCurrentWindow(), screenPos, ImVec2(screenPos.x + screenSize.x, screenPos.y + screenSize.y));
+
+	// ギズモ設定
+	ImGuizmo::SetRect(screenPos.x, screenPos.y, screenSize.x, screenSize.y);
 	ImGuizmo::BeginFrame();
+	ImGuizmo::SetDrawlist(ImGui::GetForegroundDrawList());
 
-	// ビューキューブ
+	// ビューキューブ 
+	float viewCubeArrayMatrix[16];
+	EditorGizmo::MatrixToFloatArrayColumnMajor(viewMatrix, viewCubeArrayMatrix);
 	ImGuiViewport* mainViewport = ImGui::GetMainViewport();
-	ImVec2 viewCubePos = ImVec2(screenPos.x + contentSize.x - 128.0f, screenPos.y);
-	ImVec2 viewCubeSize = ImVec2(128, 128);
-	ImGuizmo::SetDrawlist(ImGui::GetForegroundDrawList());
-	ImGuizmo::ViewManipulate(viewArrayMatrix, 10.0f, viewCubePos, viewCubeSize, IM_COL32(0, 0, 0, 0));
+	ImVec2 viewCubePos = ImVec2(screenPos.x + screenSize.x - 128.0f, screenPos.y);
+	ImVec2 viewCubeSize = ImVec2(128, 128);	
+	ImGuizmo::ViewManipulate(viewCubeArrayMatrix, 10.0f, viewCubePos, viewCubeSize, IM_COL32(0, 0, 0, 0));
 
-	// グリッドとギズモを描画
-	ImGuizmo::SetDrawlist(ImGui::GetForegroundDrawList());
+	// グリッドがアクティブの場合描画する
+	if(m_isGridActive)
 	ImGuizmo::DrawGrid(viewArrayMatrix, projectionArrayMatrix, m_arrayGridMatrix, 10.0f);
 
+	// 軸がアクティブの場合描画する
+	m_particleEmitter->DebugDraw(m_isAxisActive);
 
-	EditorGizmo::FloatArrayToMatrixColumnMajor(&m_mainViewMatrix, viewArrayMatrix);
+	// さらにギズモに触れていない場合だけ許可
+	if (ImGuizmo::IsOver() || ImGuizmo::IsUsing())
+	{
+		allow = false;
+	}
+	m_sceneAllowCameraInput = allow;
 
+	// パーティクルの粒子の描画
 	this->ParticleRender(m_particleEmitter->GetWorldMatrix(), viewMatrix, projectionMatrix);
 
 	m_commonResources->SetViewMatrix(viewMatrix);
 	m_commonResources->SetProjectionMatrix(projectionMatrix);
-	m_particleEmitter->DebugDraw();
 
 
 	// テクスチャを ImGui に貼り付け
 	if (m_main->GetShaderResourceView())
 	{
-		ImGui::Image((ImTextureID)m_main->GetShaderResourceView(), contentSize);
+		ImGui::Image((ImTextureID)m_main->GetShaderResourceView(), screenSize);
 	}
 	else
 	{
 		ImGui::Text("RenderTexture is not ready.");
 	}
-
-
-	// 逆行列を取得（ビュー行列 → ワールド行列）
-	DirectX::SimpleMath::Matrix invView = m_mainViewMatrix.Invert();
-	// カメラの位置（eye）は、逆行列の平行移動部分
-	DirectX::SimpleMath::Vector3 eyePosition = invView.Translation();
-	// 注視点を固定
-	m_mainViewMatrix = DirectX::SimpleMath::Matrix::CreateLookAt(eyePosition, { 0.0f , 0.0f ,0.0f }, DirectX::SimpleMath::Vector3::Up);
-
-
-	ImGui::End();
-}
-
-/// <summary>
-/// サブシーンを描画する
-/// </summary>
-void Scene::DrawSubScene()
-{
-	// カメラ情報の取得
-	DirectX::SimpleMath::Matrix viewMatrix = m_mainViewMatrix;
-	DirectX::SimpleMath::Matrix projectionMatrix = m_commonResources->GetProjectionMatrix();
-	float viewArrayMatrix[16], projectionArrayMatrix[16];
-	EditorGizmo::MatrixToFloatArrayColumnMajor(viewMatrix, viewArrayMatrix);
-	EditorGizmo::MatrixToFloatArrayColumnMajor(projectionMatrix, projectionArrayMatrix);
-
-	// オフスクリーン用のRTVを取得
-	auto rtv = m_sub->GetRenderTargetView();
-	auto dsv = m_commonResources->GetDeviceResources()->GetDepthStencilView();
-
-	// オフスクリーン描画クリア
-	m_context->ClearRenderTargetView(rtv, DirectX::Colors::DarkGray);
-	m_context->ClearDepthStencilView(dsv, D3D11_CLEAR_DEPTH, 1.0f, 0);
-	m_context->OMSetRenderTargets(1, &rtv, dsv);
-
-	// 粒子を描画する
-	this->ParticleRender(DirectX::SimpleMath::Matrix::Identity, m_fixedViewMatrix, projectionMatrix);
-
-	// ビューの変更
-	EditorGizmo::MatrixToFloatArrayColumnMajor(m_fixedViewMatrix, viewArrayMatrix);
-
-	// --- ImGuiウィンドウ内での描画開始 ---
-	ImGui::Begin("Scene View2", nullptr, ImGuiWindowFlags_None);
-
-	ImVec2 windowPos = ImGui::GetWindowPos();
-	ImVec2 cursorPos = ImGui::GetCursorPos();
-	ImVec2 screenPos = ImVec2(windowPos.x + cursorPos.x, windowPos.y + cursorPos.y);
-	ImVec2 contentSize = ImGui::GetContentRegionAvail();
-	// この領域ではウィンドウ移動を無効化
-	ImGui::SetWindowHitTestHole(ImGui::GetCurrentWindow(), ImVec2(screenPos.x, screenPos.y), ImVec2(contentSize));
-
-	// テクスチャを ImGui に貼り付け
-	if (m_main->GetShaderResourceView())
-	{
-		ImGui::Image((ImTextureID)m_sub->GetShaderResourceView(), contentSize);
-	}
-	else
-	{
-		ImGui::Text("RenderTexture is not ready.");
-	}
-
-	// ギズモ用描画範囲を設定
-	ImGuizmo::SetDrawlist(ImGui::GetWindowDrawList()); // ウィンドウ内に描かせる！
-	ImGuizmo::SetRect(screenPos.x, screenPos.y, contentSize.x, contentSize.y);
-	ImGuizmo::BeginFrame();
-
-	// グリッドとギズモを描画
-	ImGuizmo::SetDrawlist(ImGui::GetWindowDrawList());
-	ImGuizmo::DrawGrid(viewArrayMatrix, projectionArrayMatrix, m_arrayGridMatrix, 5.0f);
 
 	ImGui::End();
 
@@ -479,6 +423,7 @@ void Scene::DrawSubScene()
 	m_context->ClearDepthStencilView(defaultDSV, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
 	m_context->OMSetRenderTargets(1, &defaultRTV, nullptr);
 }
+
 
 /// <summary>
 /// 粒子を描画する
@@ -576,82 +521,77 @@ void Scene::ParticleRender(const DirectX::SimpleMath::Matrix& worldMatrix, const
 /// </summary>
 void Scene::ParticleDataEditor()
 {
-	ImGui::Begin("Particle Parameters Editor");
+	ImGui::SetNextWindowPos(PARTICLE_SETTINGS_WINDOW_POSITION, ImGuiCond_Always);
+	ImGui::SetNextWindowSize(PARTICLE_SETTINGS_WINDOW_SIZE, ImGuiCond_Always);
+	ImGui::Begin("Particle Settings", nullptr,
+		ImGuiWindowFlags_NoResize |
+		ImGuiWindowFlags_NoMove |
+		ImGuiWindowFlags_NoCollapse |
+		ImGuiWindowFlags_NoDocking);
 
-	//// メニューバーの開始
-	//if (ImGui::BeginMainMenuBar())
-	//{
-	//	if (ImGui::BeginMenu("File"))
-	//	{
-	//		if (ImGui::MenuItem("Load from JSON"))
-	//		{
-	//			// 読み込めたときだけ代入
-	//			if (auto parametersOpt = FileDialogUtilities::OpenJsonFile<ParticleParameters>()) {
-	//				m_parametersData = *parametersOpt; 
-	//			}
-	//		}
+	// ---- float入力 ----
+	ImGui::Text("Duration");
+	ImGui::InputFloat("##Duration", &m_parametersData.duration);
 
-	//		if (ImGui::MenuItem("Save to JSON"))
-	//		{
-	//			// JSONセーブ処理
-	//			FileDialogUtilities::SaveJsonFile<ParticleParameters>(m_parametersData);
-	//		}
+	ImGui::Text("Start Delay");
+	ImGui::InputFloat("##StartDelay", &m_parametersData.startDelay);
 
-	//		if (ImGui::MenuItem("Load Texture"))
-	//		{
-	//			// テクスチャロード処理
-	//			Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> texture = FileDialogUtilities::GetLoadTexture(m_device);
+	ImGui::Text("Life Time");
+	ImGui::InputFloat("##LifeTime", &m_parametersData.lifeTime);
 
-	//			// nullptrで無ければ格納
-	//			if (texture != nullptr)
-	//				// テクスチャを格納する
-	//				m_textures.push_back(std::move(texture));
-	//		}
+	ImGui::Text("Speed");
+	ImGui::InputFloat("##Speed", &m_parametersData.speed);
 
-	//		ImGui::EndMenu();
-	//	}
-	//	ImGui::EndMainMenuBar();
-	//}
+	ImGui::Text("Rotation");
+	ImGui::InputFloat("##Rotation", &m_parametersData.rotation);
 
+	ImGui::Text("Gravity Modifier");
+	ImGui::InputFloat("##GravityModifier", &m_parametersData.gravityModifier);
 
-	// float入力
-	ImGui::InputFloat("Duration", &m_parametersData.duration);
-	ImGui::InputFloat("Start Delay", &m_parametersData.startDelay);
-	ImGui::InputFloat("Life Time", &m_parametersData.lifeTime);
-	ImGui::InputFloat("Speed", &m_parametersData.speed);
-	ImGui::InputFloat("Rotation", &m_parametersData.rotation);
-	ImGui::InputFloat("Gravity Modifier", &m_parametersData.gravityModifier);
-	ImGui::InputFloat("Emission Rate", &m_parametersData.emissionRate);
-	ImGui::InputFloat("Cone Angle", &m_parametersData.coneAngle);
-	ImGui::InputFloat("Cone Radius", &m_parametersData.coneRadius);
-	ImGui::InputFloat("Cone Height", &m_parametersData.coneHeight);
-	ImGui::InputFloat("Sphere Radius", &m_parametersData.sphereRadius);
-	ImGui::InputFloat("Sphere Rand Dir Strength", &m_parametersData.sphereRandomDirectionStrength);
+	ImGui::Text("Emission Rate");
+	ImGui::InputFloat("##EmissionRate", &m_parametersData.emissionRate);
 
-	// bool チェック
+	ImGui::Text("Cone Angle");
+	ImGui::InputFloat("##ConeAngle", &m_parametersData.coneAngle);
+
+	ImGui::Text("Cone Radius");
+	ImGui::InputFloat("##ConeRadius", &m_parametersData.coneRadius);
+
+	ImGui::Text("Cone Height");
+	ImGui::InputFloat("##ConeHeight", &m_parametersData.coneHeight);
+
+	ImGui::Text("Sphere Radius");
+	ImGui::InputFloat("##SphereRadius", &m_parametersData.sphereRadius);
+
+	ImGui::Text("Sphere Rand Dir Strength");
+	ImGui::InputFloat("##SphereRandDirStrength", &m_parametersData.sphereRandomDirectionStrength);
+
+	// ---- bool チェック ----
 	ImGui::Checkbox("Is Looping", &m_parametersData.isLooping);
 	ImGui::Checkbox("Prewarm", &m_parametersData.prewarm);
 	ImGui::Checkbox("Is Playing", &m_parametersData.isPlaying);
 	ImGui::Checkbox("Cone Emit From Shell", &m_parametersData.coneEmitFromShell);
 	ImGui::Checkbox("Sphere Emit From Shell", &m_parametersData.sphereEmitFromShell);
 
-	// Vector3 入力
-	ImGui::InputFloat3("Start Scale", &m_parametersData.startScale.x);
-	ImGui::InputFloat3("Cone Direction", &m_parametersData.coneDirection.x);
-	ImGui::InputFloat3("Cone Position", &m_parametersData.conePosition.x);
-	ImGui::InputFloat3("Sphere Center", &m_parametersData.sphereCenter.x);
+	// ---- Vector3 入力 ----
+	ImGui::Text("Start Scale");
+	ImGui::InputFloat3("##StartScale", &m_parametersData.startScale.x);
 
-	// Vector4 入力
-	ImGui::InputFloat4("Start Color", &m_parametersData.startColor.x);
+	ImGui::Text("Cone Direction");
+	ImGui::InputFloat3("##ConeDirection", &m_parametersData.coneDirection.x);
 
-	
+	ImGui::Text("Cone Position");
+	ImGui::InputFloat3("##ConePosition", &m_parametersData.conePosition.x);
 
+	ImGui::Text("Sphere Center");
+	ImGui::InputFloat3("##SphereCenter", &m_parametersData.sphereCenter.x);
 
+	// ---- Vector4 入力 ----
+	ImGui::Text("Start Color");
+	ImGui::InputFloat4("##StartColor", &m_parametersData.startColor.x);
 
-	// 現在選択されているテクスチャインデックス
+	// ---- テクスチャ選択 ----
 	static int selectedTextureIndex = 0;
-
-	// テクスチャ数に基づいて最大値を制限
 	const int textureCount = static_cast<int>(m_textures.size());
 	if (textureCount > 0)
 	{
@@ -679,7 +619,6 @@ void Scene::ParticleDataEditor()
 	{
 		ImGui::Text("No textures loaded.");
 	}
-
 
 	ImGui::End();
 
